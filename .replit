@@ -37,3 +37,8 @@ author = "agent"
 task = "shell.exec"
 args = "npm run dev"
 waitForPort = 5000
+
+[userenv]
+
+[userenv.shared]
+DEEPGRAM_API_KEY = "4590bf20d72e5322e1324970a2fb2e261fcb62c4"
