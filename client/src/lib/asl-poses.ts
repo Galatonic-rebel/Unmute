@@ -20,10 +20,29 @@ export interface HandPose {
   middle: FingerState;
   ring:   FingerState;
   pinky:  FingerState;
-  wristX?: number;   // up/down tilt
-  wristY?: number;   // left/right rotation
-  wristZ?: number;   // roll
+  wristX?: number;   // palm tilt (flex/extend)
+  wristY?: number;   // pronation / supination
+  wristZ?: number;   // radial / ulnar deviation (roll)
+  posX?:  number;    // world-X offset from rest (metres; +ve = toward viewer's right)
+  posY?:  number;    // world-Y offset from rest (metres; +ve = upward)
+  posZ?:  number;    // world-Z offset from rest (metres; +ve = toward camera)
 }
+
+// ─── Signing-area position offsets (posY from hand rest at world y ≈ -0.08) ─────
+// Face centre is at world y = +0.50. Offsets below bring the dominant hand
+// to each facial / body area. Computed from the face geometry in SignAvatar.tsx.
+const AT_JAW      = 0.40;   // lower jaw / chin base (world y ≈ +0.32)
+const AT_CHIN     = 0.44;   // chin tip              (world y ≈ +0.36)
+const AT_MOUTH    = 0.51;   // lips                  (world y ≈ +0.43)
+const AT_CHEEK    = 0.46;   // cheekbone             (world y ≈ +0.38)
+const AT_NOSE     = 0.54;   // nose tip              (world y ≈ +0.46)
+const AT_EYE      = 0.62;   // eye level             (world y ≈ +0.54)
+const AT_TEMPLE   = 0.64;   // temple / side-head    (world y ≈ +0.56)
+const AT_FOREHEAD = 0.68;   // forehead              (world y ≈ +0.60)
+const AT_CHEST    = 0.12;   // upper chest           (world y ≈ +0.04)
+// Helper: spread position fields onto any HandPose
+const atPos = (pose: HandPose, y: number, z = 0.04, x = 0): HandPose =>
+  ({ ...pose, posX: x, posY: y, posZ: z });
 
 export interface FaceExpression {
   eyebrowRaise: number;   // -1 furrowed → 0 neutral → 1 raised
@@ -444,13 +463,14 @@ const I_SHAPE: HandPose = {
 export const WORD_SIGNS: Record<string, WordSign> = {
 
   // ── Greetings & Farewells ──────────────────────────────────
+  // HELLO: B-hand salute — flat hand at temple, sweeps outward like a salute
   hello: animSign([
-    { right: FLAT_B, left: FIST, face: HAPPY_FACE, holdMs: 280 },
-    { right: { ...FLAT_B, wristZ: 0.38 }, left: FIST, face: HAPPY_FACE, holdMs: 500 },
+    { right: atPos(FLAT_B, AT_TEMPLE, 0.01, +0.06), left: FIST, face: HAPPY_FACE, holdMs: 280 },
+    { right: { ...atPos(FLAT_B, AT_TEMPLE - 0.05, 0.07), wristZ: 0.28 }, left: FIST, face: HAPPY_FACE, holdMs: 500 },
   ]),
   hi: animSign([
-    { right: FLAT_B, left: FIST, face: HAPPY_FACE, holdMs: 380 },
-    { right: { ...FLAT_B, wristZ: 0.42 }, left: FIST, face: HAPPY_FACE, holdMs: 420 },
+    { right: atPos(FLAT_B, AT_TEMPLE, 0.01, +0.06), left: FIST, face: HAPPY_FACE, holdMs: 320 },
+    { right: { ...atPos(FLAT_B, AT_TEMPLE - 0.04, 0.06), wristZ: 0.32 }, left: FIST, face: HAPPY_FACE, holdMs: 380 },
   ]),
   goodbye: animSign([
     { right: OPEN, left: FIST, face: HAPPY_FACE, holdMs: 280 },
@@ -466,19 +486,30 @@ export const WORD_SIGNS: Record<string, WordSign> = {
     { right: OPEN, left: FIST, face: HAPPY_FACE, holdMs: 280 },
     { right: { ...OPEN, wristZ: 0.4 }, left: FIST, face: HAPPY_FACE, holdMs: 500 },
   ]),
-  please: staticSign(FLAT_B, FIST, { ...NEUTRAL_FACE, mouthSmile: 0.45 }),
-  sorry: repeated(A_SHAPE, FIST, { ...A_SHAPE, wristX: 0.22 }, FIST, SAD_FACE),
+  // PLEASE: flat B hand on chest, circular rubbing motion
+  please: animSign([
+    { right: atPos(FLAT_B, AT_CHEST, 0.07), left: FIST, face: { ...NEUTRAL_FACE, mouthSmile: 0.45 }, holdMs: 280 },
+    { right: { ...atPos(FLAT_B, AT_CHEST, 0.07), wristZ: 0.30 }, left: FIST, face: { ...NEUTRAL_FACE, mouthSmile: 0.45 }, holdMs: 280 },
+    { right: atPos(FLAT_B, AT_CHEST, 0.07), left: FIST, face: { ...NEUTRAL_FACE, mouthSmile: 0.45 }, holdMs: 240 },
+  ]),
+  // SORRY: A-hand (fist) circular motion on chest
+  sorry: animSign([
+    { right: atPos(A_SHAPE, AT_CHEST, 0.07), left: FIST, face: SAD_FACE, holdMs: 280 },
+    { right: { ...atPos(A_SHAPE, AT_CHEST, 0.07), wristZ: 0.28 }, left: FIST, face: SAD_FACE, holdMs: 280 },
+    { right: atPos(A_SHAPE, AT_CHEST, 0.07), left: FIST, face: SAD_FACE, holdMs: 240 },
+  ]),
   'excuse me': animSign([
     { right: FLAT_B, left: FLAT_B, face: NEUTRAL_FACE, holdMs: 280 },
     { right: { ...FLAT_B, wristX: 0.3 }, left: FLAT_B, face: NEUTRAL_FACE, holdMs: 400 },
   ]),
+  // THANK YOU: B-hand from chin sweeps forward — fingertips start at chin, arc forward
   'thank you': animSign([
-    { right: FLAT_B, left: FIST, face: HAPPY_FACE, holdMs: 280 },
-    { right: { ...FLAT_B, wristX: 0.38 }, left: FIST, face: HAPPY_FACE, holdMs: 520 },
+    { right: atPos(FLAT_B, AT_CHIN, 0.02, +0.04), left: FIST, face: HAPPY_FACE, holdMs: 280 },
+    { right: { ...atPos(FLAT_B, AT_CHIN - 0.07, 0.13), wristX: 0.28 }, left: FIST, face: HAPPY_FACE, holdMs: 520 },
   ]),
   thanks: animSign([
-    { right: FLAT_B, left: FIST, face: HAPPY_FACE, holdMs: 280 },
-    { right: { ...FLAT_B, wristX: 0.38 }, left: FIST, face: HAPPY_FACE, holdMs: 520 },
+    { right: atPos(FLAT_B, AT_CHIN, 0.02, +0.04), left: FIST, face: HAPPY_FACE, holdMs: 280 },
+    { right: { ...atPos(FLAT_B, AT_CHIN - 0.07, 0.13), wristX: 0.28 }, left: FIST, face: HAPPY_FACE, holdMs: 520 },
   ]),
   "you're welcome": animSign([
     { right: OPEN, left: FIST, face: HAPPY_FACE, holdMs: 280 },
@@ -581,10 +612,16 @@ export const WORD_SIGNS: Record<string, WordSign> = {
     { right: { ...POINT_UP, wristZ: -0.3 }, left: FIST, face: WH_QUESTION_FACE, holdMs: 260 },
   ]),
   when: staticSign(POINT_UP, POINT_UP, WH_QUESTION_FACE),
-  who: staticSign(D_SHAPE, FIST, WH_QUESTION_FACE),
+  // WHO: D-hand circles near chin / lower face area
+  who: animSign([
+    { right: atPos(D_SHAPE, AT_CHIN, 0.04, +0.02), left: FIST, face: WH_QUESTION_FACE, holdMs: 300 },
+    { right: { ...atPos(D_SHAPE, AT_CHIN, 0.04, +0.02), wristZ: 0.22 }, left: FIST, face: WH_QUESTION_FACE, holdMs: 280 },
+    { right: atPos(D_SHAPE, AT_CHIN, 0.04, +0.02), left: FIST, face: WH_QUESTION_FACE, holdMs: 240 },
+  ]),
+  // WHY: hand at temple, fingers fold to Y-shape as hand moves outward
   why: animSign([
-    { right: FLAT_B, left: FIST, face: WH_QUESTION_FACE, holdMs: 280 },
-    { right: Y_SHAPE, left: FIST, face: WH_QUESTION_FACE, holdMs: 420 },
+    { right: atPos(FLAT_B, AT_TEMPLE, 0.01, +0.05), left: FIST, face: WH_QUESTION_FACE, holdMs: 280 },
+    { right: { ...atPos(Y_SHAPE, AT_TEMPLE - 0.02, 0.06), }, left: FIST, face: WH_QUESTION_FACE, holdMs: 420 },
   ]),
   how: animSign([
     { right: CURVED, left: CURVED, face: WH_QUESTION_FACE, holdMs: 280 },
@@ -605,11 +642,24 @@ export const WORD_SIGNS: Record<string, WordSign> = {
   ]),
 
   // ── Emotions & Feelings ──────────────────────────────────
-  happy: repeated(FLAT_B, FIST, { ...FLAT_B, wristX: 0.22 }, FIST, HAPPY_FACE),
+  // HAPPY: B-hand brushes upward on chest twice (circular chest motion)
+  happy: animSign([
+    { right: atPos(FLAT_B, AT_CHEST, 0.07), left: FIST, face: HAPPY_FACE, holdMs: 260 },
+    { right: { ...atPos(FLAT_B, AT_CHEST + 0.04, 0.07), wristX: 0.20 }, left: FIST, face: HAPPY_FACE, holdMs: 240 },
+    { right: atPos(FLAT_B, AT_CHEST, 0.07), left: FIST, face: HAPPY_FACE, holdMs: 260 },
+  ]),
   sad: twoFrame(FLAT_B, FLAT_B, { ...FLAT_B, wristX: -0.28 }, { ...FLAT_B, wristX: -0.28 }, SAD_FACE),
-  love: staticSign(A_SHAPE, A_SHAPE, { ...HAPPY_FACE, mouthSmile: 0.95 }, 750),
+  // LOVE: both arms crossed over chest — right arm crosses over left
+  love: staticSign(
+    { ...A_SHAPE, posX: +0.14, posY: AT_CHEST + 0.02, posZ: 0.09 },
+    { ...A_SHAPE, posX: -0.14, posY: AT_CHEST + 0.02, posZ: 0.09 },
+    { ...HAPPY_FACE, mouthSmile: 0.95 }, 750),
   angry: twoFrame(CLAW, FIST, FIST, FIST, ANGRY_FACE),
-  good: twoFrame(FLAT_B, FIST, { ...FLAT_B, wristX: 0.22 }, FLAT_B, HAPPY_FACE),
+  // GOOD: B-hand from chin forward — start at chin, arc forward and down
+  good: animSign([
+    { right: atPos(FLAT_B, AT_CHIN, 0.02, +0.04), left: FIST, face: HAPPY_FACE, holdMs: 280 },
+    { right: { ...atPos(FLAT_B, AT_CHIN - 0.06, 0.12), wristX: 0.22 }, left: FLAT_B, face: HAPPY_FACE, holdMs: 440 },
+  ]),
   bad: twoFrame(FLAT_B, FIST, { ...FLAT_B, wristZ: -0.42 }, FIST, SAD_FACE),
   great: twoFrame(OPEN, FIST, { ...OPEN, wristX: 0.2 }, FIST, HAPPY_FACE),
   wonderful: animSign([
@@ -692,12 +742,18 @@ export const WORD_SIGNS: Record<string, WordSign> = {
   ]),
 
   // ── Mental / Cognitive ────────────────────────────────────
+  // THINK: index fingertip taps temple
   think: animSign([
-    { right: POINT_UP, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
-    { right: { ...POINT_UP, wristZ: 0.2 }, left: FIST, face: NEUTRAL_FACE, holdMs: 400 },
+    { right: atPos(POINT_UP, AT_TEMPLE, 0.01, +0.07), left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...atPos(POINT_UP, AT_TEMPLE, 0.01, +0.07), wristZ: 0.18 }, left: FIST, face: NEUTRAL_FACE, holdMs: 400 },
   ]),
-  know: staticSign(FLAT_B, FIST),
-  understand: twoFrame(POINT_UP, FIST, { ...POINT_UP, wristX: 0.32 }, FIST),
+  // KNOW: flat B-hand taps forehead/temple
+  know: staticSign(atPos(FLAT_B, AT_TEMPLE, 0.01, +0.06), FIST),
+  // UNDERSTAND: index at forehead snaps open (index straightens upward)
+  understand: animSign([
+    { right: atPos(POINT_UP, AT_FOREHEAD, 0.01, +0.04), left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...atPos(POINT_UP, AT_FOREHEAD, 0.01, +0.04), wristX: 0.30 }, left: FIST, face: NEUTRAL_FACE, holdMs: 440 },
+  ]),
   believe: animSign([
     { right: FLAT_B, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
     { right: FIST, left: FIST, face: NEUTRAL_FACE, holdMs: 400 },
@@ -716,7 +772,11 @@ export const WORD_SIGNS: Record<string, WordSign> = {
   ]),
   decide: twoFrame(OPEN5, OPEN5, { ...OPEN5, wristX: 0.35 }, { ...OPEN5, wristX: 0.35 }),
   choose: twoFrame(V_SHAPE, OPEN5, FIST, OPEN5),
-  learn: twoFrame(O_SHAPE, FLAT_B, { ...FLAT_B, wristX: 0.3 }, FLAT_B),
+  // LEARN: curved hand draws info from open palm, lifts to forehead
+  learn: animSign([
+    { right: O_SHAPE, left: atPos(FLAT_B, 0, 0.12, -0.04), face: NEUTRAL_FACE, holdMs: 280 },
+    { right: atPos(FLAT_B, AT_FOREHEAD, 0.01, +0.04), left: atPos(FLAT_B, 0, 0.12, -0.04), face: NEUTRAL_FACE, holdMs: 480 },
+  ]),
   teach: twoFrame(O_SHAPE, O_SHAPE, { ...O_SHAPE, wristZ: 0.25 }, { ...O_SHAPE, wristZ: -0.25 }),
   practice: repeated(A_SHAPE, U_SHAPE, { ...A_SHAPE, wristZ: 0.2 }, U_SHAPE),
   study: twoFrame(OPEN5, FLAT_B, { ...OPEN5, wristX: 0.25 }, FLAT_B),
@@ -725,7 +785,11 @@ export const WORD_SIGNS: Record<string, WordSign> = {
   stop: twoFrame(FLAT_B, FLAT_B, { ...FLAT_B, wristX: 0.45 }, FLAT_B),
   go: twoFrame(POINT_UP, POINT_UP, { ...POINT_UP, wristZ: 0.32 }, { ...POINT_UP, wristZ: 0.32 }),
   come: twoFrame(POINT_UP, POINT_UP, { ...POINT_UP, wristZ: -0.3 }, { ...POINT_UP, wristZ: -0.3 }),
-  want: twoFrame(CURVED, CURVED, FIST, FIST),
+  // WANT: claw hands held out, palms up, pull toward body (simulate pulling inward)
+  want: animSign([
+    { right: { ...CURVED, posZ: +0.14, posY: +0.06 }, left: { ...CURVED, posZ: +0.14, posY: +0.06 }, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...FIST, posZ: 0, posY: +0.04 }, left: { ...FIST, posZ: 0, posY: +0.04 }, face: NEUTRAL_FACE, holdMs: 440 },
+  ]),
   need: repeated(X_SHAPE, FIST, { ...X_SHAPE, wristX: 0.22 }, FIST),
   have: twoFrame(CURVED, CURVED, FIST, FIST),
   see: staticSign(V_SHAPE, FIST),
@@ -767,12 +831,31 @@ export const WORD_SIGNS: Record<string, WordSign> = {
     { right: V_SHAPE, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
     { right: { ...V_SHAPE, wristZ: 0.2 }, left: FIST, face: NEUTRAL_FACE, holdMs: 420 },
   ]),
-  eat: repeated(O_SHAPE, FIST, { ...O_SHAPE, wristX: 0.22 }, FIST, { ...NEUTRAL_FACE, mouthOpen: 0.3 }),
-  drink: repeated(CURVED, FIST, { ...CURVED, wristX: 0.32 }, FIST, { ...NEUTRAL_FACE, mouthOpen: 0.35 }),
+  // EAT / FOOD: bunched-O hand taps mouth repeatedly
+  eat: animSign([
+    { right: atPos(O_SHAPE, AT_MOUTH, 0.02, +0.04), left: FIST, face: { ...NEUTRAL_FACE, mouthOpen: 0.28 }, holdMs: 260 },
+    { right: { ...atPos(O_SHAPE, AT_MOUTH + 0.04, 0.02, +0.04), wristX: 0.20 }, left: FIST, face: { ...NEUTRAL_FACE, mouthOpen: 0.28 }, holdMs: 240 },
+    { right: atPos(O_SHAPE, AT_MOUTH, 0.02, +0.04), left: FIST, face: { ...NEUTRAL_FACE, mouthOpen: 0.28 }, holdMs: 260 },
+  ]),
+  // DRINK: curved hand like holding a cup, tilts toward mouth
+  drink: animSign([
+    { right: atPos(CURVED, AT_MOUTH, 0.03, +0.04), left: FIST, face: { ...NEUTRAL_FACE, mouthOpen: 0.30 }, holdMs: 280 },
+    { right: { ...atPos(CURVED, AT_MOUTH + 0.04, 0.03, +0.04), wristX: 0.30 }, left: FIST, face: { ...NEUTRAL_FACE, mouthOpen: 0.30 }, holdMs: 280 },
+    { right: atPos(CURVED, AT_MOUTH, 0.03, +0.04), left: FIST, face: { ...NEUTRAL_FACE, mouthOpen: 0.30 }, holdMs: 240 },
+  ]),
   cook: repeated(FLAT_B, FLAT_B, { ...FLAT_B, wristZ: 0.3 }, { ...FLAT_B, wristZ: 0.3 }),
-  sleep: twoFrame(OPEN5, FIST, { ...OPEN5, wristX: 0.35 }, FIST, { ...NEUTRAL_FACE, eyeSquint: 1 }),
+  // SLEEP: open hand draws down over face — starts at forehead, closes to cheek
+  sleep: animSign([
+    { right: atPos(OPEN5, AT_EYE, 0.01, +0.04), left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...atPos(OPEN5, AT_CHEEK, 0.01, +0.04), wristX: 0.32 }, left: FIST, face: { ...NEUTRAL_FACE, eyeSquint: 1 }, holdMs: 480 },
+  ]),
   wake: twoFrame({ ...OPEN5, wristX: 0.3 }, FIST, OPEN5, FIST, { ...NEUTRAL_FACE, eyebrowRaise: 0.4 }),
-  work: repeated(S_SHAPE, S_SHAPE, { ...S_SHAPE, wristX: 0.22 }, S_SHAPE),
+  // WORK: right S-hand (wrist) taps left S-hand — both hands meet at center
+  work: animSign([
+    { right: { ...S_SHAPE, posX: +0.06 }, left: { ...S_SHAPE, posX: -0.06 }, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...S_SHAPE, posX: +0.06, wristX: 0.22 }, left: { ...S_SHAPE, posX: -0.06 }, face: NEUTRAL_FACE, holdMs: 260 },
+    { right: { ...S_SHAPE, posX: +0.06 }, left: { ...S_SHAPE, posX: -0.06 }, face: NEUTRAL_FACE, holdMs: 260 },
+  ]),
   play: repeated(Y_SHAPE, Y_SHAPE, { ...Y_SHAPE, wristZ: 0.32 }, { ...Y_SHAPE, wristZ: -0.32 }, HAPPY_FACE),
   run: repeated(L_SHAPE, L_SHAPE, { ...L_SHAPE, wristZ: 0.3 }, { ...L_SHAPE, wristZ: 0.3 }),
   walk: repeated(V_SHAPE, FIST, { ...V_SHAPE, wristX: 0.2 }, FIST),
@@ -852,7 +935,11 @@ export const WORD_SIGNS: Record<string, WordSign> = {
   ]),
   text: twoFrame(X_SHAPE, FLAT_B, { ...X_SHAPE, wristZ: 0.2 }, FLAT_B),
   share: twoFrame(FLAT_B, FLAT_B, { ...FLAT_B, wristZ: 0.35 }, { ...FLAT_B, wristZ: 0.35 }),
-  help: twoFrame(A_SHAPE, FLAT_B, { ...A_SHAPE, wristX: 0.3 }, FLAT_B),
+  // HELP: flat left palm supports right A-hand, lifts upward together
+  help: animSign([
+    { right: { ...A_SHAPE, posX: +0.06, posY: 0 }, left: { ...FLAT_B, posX: -0.06, posY: 0 }, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...A_SHAPE, posX: +0.06, posY: +0.10 }, left: { ...FLAT_B, posX: -0.06, posY: +0.10 }, face: NEUTRAL_FACE, holdMs: 440 },
+  ]),
   fight: repeated(A_SHAPE, A_SHAPE, { ...A_SHAPE, wristZ: 0.3 }, { ...A_SHAPE, wristZ: -0.3 }, ANGRY_FACE),
   protect: twoFrame(S_SHAPE, S_SHAPE, { ...S_SHAPE, wristX: 0.25 }, S_SHAPE),
   hurry: repeated(S_SHAPE, FIST, { ...S_SHAPE, wristX: 0.2 }, FIST),
@@ -860,7 +947,12 @@ export const WORD_SIGNS: Record<string, WordSign> = {
   relax: staticSign(OPEN, OPEN, { ...NEUTRAL_FACE, eyeSquint: 0.15 }),
 
   // ── Modifiers / Adverbs ───────────────────────────────────
-  more: repeated(O_SHAPE, O_SHAPE, { ...O_SHAPE, wristX: 0.2 }, O_SHAPE),
+  // MORE: O-fingertips tap together — both hands meet at center
+  more: animSign([
+    { right: { ...O_SHAPE, posX: +0.08, posY: +0.06 }, left: { ...O_SHAPE, posX: -0.08, posY: +0.06 }, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...O_SHAPE, posX: +0.08, posY: +0.06, wristX: 0.18 }, left: { ...O_SHAPE, posX: -0.08, posY: +0.06 }, face: NEUTRAL_FACE, holdMs: 260 },
+    { right: { ...O_SHAPE, posX: +0.08, posY: +0.06 }, left: { ...O_SHAPE, posX: -0.08, posY: +0.06 }, face: NEUTRAL_FACE, holdMs: 260 },
+  ]),
   less: twoFrame(O_SHAPE, O_SHAPE, { ...O_SHAPE, wristX: -0.2 }, O_SHAPE),
   again: twoFrame(CURVED, FLAT_B, FLAT_B, FLAT_B),
   also: twoFrame(Y_SHAPE, FIST, { ...Y_SHAPE, wristZ: 0.3 }, FIST),
@@ -950,7 +1042,12 @@ export const WORD_SIGNS: Record<string, WordSign> = {
   history: twoFrame(H_SHAPE, FIST, { ...H_SHAPE, wristZ: -0.3 }, FIST),
 
   // ── People & Relationships ────────────────────────────────
-  name: repeated(H_SHAPE, H_SHAPE, { ...H_SHAPE, wristX: 0.22 }, H_SHAPE),
+  // NAME: H-hands tap together (index+middle extended, tapping at center)
+  name: animSign([
+    { right: { ...H_SHAPE, posX: +0.06 }, left: { ...H_SHAPE, posX: -0.06 }, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...H_SHAPE, posX: +0.06, wristX: 0.22 }, left: { ...H_SHAPE, posX: -0.06 }, face: NEUTRAL_FACE, holdMs: 260 },
+    { right: { ...H_SHAPE, posX: +0.06 }, left: { ...H_SHAPE, posX: -0.06 }, face: NEUTRAL_FACE, holdMs: 260 },
+  ]),
   person: twoFrame(FLAT_B, FLAT_B, { ...FLAT_B, wristX: 0.3 }, { ...FLAT_B, wristX: 0.3 }),
   people: repeated(FLAT_B, FLAT_B, { ...FLAT_B, wristZ: 0.25 }, { ...FLAT_B, wristZ: -0.25 }),
   man: twoFrame(FLAT_B, FIST, { ...FLAT_B, wristX: 0.22 }, FIST),
@@ -959,24 +1056,32 @@ export const WORD_SIGNS: Record<string, WordSign> = {
   girl: twoFrame(A_SHAPE, FIST, { ...A_SHAPE, wristX: -0.25 }, FIST),
   child: twoFrame(FLAT_B, FIST, { ...FLAT_B, wristX: -0.3 }, FIST),
   baby: repeated(CURVED, CURVED, { ...CURVED, wristX: 0.2 }, { ...CURVED, wristX: 0.2 }, { ...NEUTRAL_FACE, mouthSmile: 0.5 }),
-  friend: staticSign(H_SHAPE, H_SHAPE, HAPPY_FACE),
-  family: twoFrame(F_SHAPE, F_SHAPE, { ...F_SHAPE, wristZ: 0.4 }, { ...F_SHAPE, wristZ: -0.4 }),
-  mother: animSign([
-    { right: A_SHAPE, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
-    { right: FINGERSPELLING.M, left: FIST, face: NEUTRAL_FACE, holdMs: 420 },
+  // FRIEND: H-shapes (hooked index+middle) link and swap — both hands meet at center
+  friend: animSign([
+    { right: { ...H_SHAPE, posX: +0.08 }, left: { ...H_SHAPE, posX: -0.08 }, face: HAPPY_FACE, holdMs: 280 },
+    { right: { ...H_SHAPE, posX: +0.08, wristX: 0.25 }, left: { ...H_SHAPE, posX: -0.08, wristX: 0.25 }, face: HAPPY_FACE, holdMs: 440 },
   ]),
-  father: animSign([
-    { right: FLAT_B, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
-    { right: FINGERSPELLING.F, left: FIST, face: NEUTRAL_FACE, holdMs: 420 },
+  // FAMILY: F-shapes start together at center, circle outward and forward
+  family: animSign([
+    { right: { ...F_SHAPE, posX: +0.06 }, left: { ...F_SHAPE, posX: -0.06 }, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...F_SHAPE, wristZ: 0.38, posX: -0.02 }, left: { ...F_SHAPE, wristZ: -0.38, posX: +0.02 }, face: NEUTRAL_FACE, holdMs: 480 },
   ]),
-  mom: animSign([
-    { right: A_SHAPE, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
-    { right: FINGERSPELLING.M, left: FIST, face: NEUTRAL_FACE, holdMs: 420 },
-  ]),
-  dad: animSign([
-    { right: FLAT_B, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
-    { right: FINGERSPELLING.F, left: FIST, face: NEUTRAL_FACE, holdMs: 420 },
-  ]),
+  // MOTHER: open-5 hand, thumb touches chin (thumb side of hand at chin)
+  mother: staticSign(
+    { ...OPEN5, posY: AT_CHIN, posX: +0.05, posZ: 0.03, wristZ: -0.12 },
+    FIST, NEUTRAL_FACE, 720),
+  // FATHER: open-5 hand, thumb touches forehead
+  father: staticSign(
+    { ...OPEN5, posY: AT_FOREHEAD, posX: +0.04, posZ: 0.01, wristZ: -0.10 },
+    FIST, NEUTRAL_FACE, 720),
+  // MOM: same as MOTHER
+  mom: staticSign(
+    { ...OPEN5, posY: AT_CHIN, posX: +0.05, posZ: 0.03, wristZ: -0.12 },
+    FIST, NEUTRAL_FACE, 720),
+  // DAD: same as FATHER
+  dad: staticSign(
+    { ...OPEN5, posY: AT_FOREHEAD, posX: +0.04, posZ: 0.01, wristZ: -0.10 },
+    FIST, NEUTRAL_FACE, 720),
   brother: twoFrame(L_SHAPE, L_SHAPE, { ...L_SHAPE, wristX: 0.3 }, L_SHAPE),
   sister: twoFrame(L_SHAPE, L_SHAPE, { ...L_SHAPE, wristX: -0.3 }, L_SHAPE),
   son: animSign([
@@ -1048,8 +1153,18 @@ export const WORD_SIGNS: Record<string, WordSign> = {
   blood: twoFrame(CURVED, FIST, { ...CURVED, wristX: -0.25 }, FIST),
 
   // ── Food & Drink ──────────────────────────────────────────
-  food: repeated(O_SHAPE, FIST, { ...O_SHAPE, wristX: 0.22 }, FIST, { ...NEUTRAL_FACE, mouthOpen: 0.2 }),
-  water: repeated(W_SHAPE, FIST, { ...W_SHAPE, wristX: 0.22 }, FIST),
+  // FOOD: same motion as EAT — O-hand repeatedly to mouth
+  food: animSign([
+    { right: atPos(O_SHAPE, AT_MOUTH, 0.02, +0.04), left: FIST, face: { ...NEUTRAL_FACE, mouthOpen: 0.25 }, holdMs: 260 },
+    { right: { ...atPos(O_SHAPE, AT_MOUTH + 0.04, 0.02, +0.04), wristX: 0.20 }, left: FIST, face: { ...NEUTRAL_FACE, mouthOpen: 0.25 }, holdMs: 240 },
+    { right: atPos(O_SHAPE, AT_MOUTH, 0.02, +0.04), left: FIST, face: { ...NEUTRAL_FACE, mouthOpen: 0.25 }, holdMs: 240 },
+  ]),
+  // WATER: W-hand taps chin/mouth — W held at lower face
+  water: animSign([
+    { right: atPos(W_SHAPE, AT_MOUTH, 0.02, +0.04), left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...atPos(W_SHAPE, AT_MOUTH, 0.02, +0.04), wristX: 0.20 }, left: FIST, face: NEUTRAL_FACE, holdMs: 260 },
+    { right: atPos(W_SHAPE, AT_MOUTH, 0.02, +0.04), left: FIST, face: NEUTRAL_FACE, holdMs: 240 },
+  ]),
   hungry: twoFrame(CURVED, FIST, { ...CURVED, wristX: 0.35 }, FIST),
   thirsty: twoFrame(POINT_UP, FIST, { ...POINT_UP, wristX: 0.4 }, FIST),
   apple: repeated(A_SHAPE, FIST, { ...A_SHAPE, wristZ: 0.25 }, FIST),
@@ -1193,7 +1308,11 @@ export const WORD_SIGNS: Record<string, WordSign> = {
   // ── Places & Locations ────────────────────────────────────
   here: repeated(POINT_UP, FIST, { ...POINT_UP, wristZ: 0.2 }, FIST),
   there: twoFrame(POINT_UP, FIST, { ...POINT_UP, wristZ: 0.35 }, FIST),
-  home: twoFrame(O_SHAPE, FIST, FLAT_B, FIST),
+  // HOME: O-hand touches cheek then opens to B-hand at same cheek location
+  home: animSign([
+    { right: atPos(O_SHAPE, AT_CHEEK, 0.02, +0.06), left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: atPos(FLAT_B, AT_CHEEK, 0.02, +0.06), left: FIST, face: NEUTRAL_FACE, holdMs: 440 },
+  ]),
   house: animSign([
     { right: FLAT_B, left: FLAT_B, face: NEUTRAL_FACE, holdMs: 280 },
     { right: { ...FLAT_B, wristZ: 0.3 }, left: { ...FLAT_B, wristZ: -0.3 }, face: NEUTRAL_FACE, holdMs: 280 },

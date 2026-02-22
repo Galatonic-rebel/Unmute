@@ -16,15 +16,27 @@ interface QueueItem {
   holdMs: number;
 }
 
-// Idle hand resting poses (relaxed, not flat OPEN)
+// ─── Hand world-space rest positions ──────────────────────────────────────────
+// Right hand: signer's RIGHT hand = viewer's LEFT  (x < 0)
+// Left  hand: signer's LEFT  hand = viewer's RIGHT (x > 0)
+// With MCP_POS having thumb at local x=-0.068 (outer) and pinky at +0.060 (inner
+// when viewed from the palm side), placing the right hand at x=-0.26 means:
+//   thumb  world x = -0.26 - 0.068 = -0.328  (outer/leftward)
+//   pinky  world x = -0.26 + 0.060 = -0.200  (inner/rightward toward centre) ✓
+const REST_R = { x: -0.26, y: -0.08, z: 0.18 };
+const REST_L = { x:  0.26, y: -0.08, z: 0.18 };
+
+// Idle hand resting poses (relaxed natural, slight inward wrist rotation)
 const IDLE_RIGHT: HandPose = {
   thumb:  { flex: 0.1, abd: 0.5 },
   index:  { curl: 0.15, spread: -0.05 },
   middle: { curl: 0.15, spread: 0 },
   ring:   { curl: 0.18, spread: 0.05 },
   pinky:  { curl: 0.22, spread: 0.08 },
+  wristY: -0.12,   // slight inward rotation: right palm faces mildly toward centre
 };
-const IDLE_LEFT: HandPose = { ...IDLE_RIGHT };
+// Left hand uses the same values; scale.x=-1 on the root mirrors wristY visually
+const IDLE_LEFT: HandPose = { ...IDLE_RIGHT, wristY: 0.12 };
 
 export function SignAvatar({ currentWord, isRecording, signQueue }: SignAvatarProps) {
   const canvasRef   = useRef<HTMLCanvasElement>(null);
@@ -174,35 +186,42 @@ export function SignAvatar({ currentWord, isRecording, signQueue }: SignAvatarPr
       scene.add(collar);
 
       // ── Arms ──────────────────────────────────────────────────────────
-      // Upper arms
+      // Upper arms — signer's RIGHT arm is on viewer's LEFT (x<0)
       const armGeo = new THREE.CapsuleGeometry(0.050, 0.22, 4, 10);
-      const lArmGroup = new THREE.Group();
-      lArmGroup.position.set(-0.22, 0.01, 0);
-      lArmGroup.rotation.z = 0.28;
-      lArmGroup.add(new THREE.Mesh(armGeo, shirtMat));
-      scene.add(lArmGroup);
 
-      const rArmGroup = new THREE.Group();
-      rArmGroup.position.set( 0.22, 0.01, 0);
-      rArmGroup.rotation.z = -0.28;
-      rArmGroup.add(new THREE.Mesh(armGeo.clone(), shirtMat));
-      scene.add(rArmGroup);
+      // Signer's right upper arm → viewer's left
+      const rUpperArm = new THREE.Group();
+      rUpperArm.position.set(-0.22, 0.01, 0);
+      rUpperArm.rotation.z = 0.28;
+      rUpperArm.add(new THREE.Mesh(armGeo, shirtMat));
+      scene.add(rUpperArm);
 
-      // Forearms (skin)
+      // Signer's left upper arm → viewer's right
+      const lUpperArm = new THREE.Group();
+      lUpperArm.position.set( 0.22, 0.01, 0);
+      lUpperArm.rotation.z = -0.28;
+      lUpperArm.add(new THREE.Mesh(armGeo.clone(), shirtMat));
+      scene.add(lUpperArm);
+
+      // Forearms (skin) — matching upper arm sides
       const skinArmMat = new THREE.MeshStandardMaterial({
         color: 0xc8855a, roughness: 0.68, metalness: 0,
       });
       const forearmGeo = new THREE.CapsuleGeometry(0.040, 0.20, 4, 10);
-      const lForearm = new THREE.Mesh(forearmGeo, skinArmMat);
-      lForearm.position.set(-0.30, -0.17, 0.06);
-      lForearm.rotation.z = 0.08;
-      lForearm.castShadow = true;
-      scene.add(lForearm);
-      const rForearm = new THREE.Mesh(forearmGeo.clone(), skinArmMat);
-      rForearm.position.set( 0.30, -0.17, 0.06);
-      rForearm.rotation.z = -0.08;
+
+      // Signer's right forearm → viewer's left
+      const rForearm = new THREE.Mesh(forearmGeo, skinArmMat);
+      rForearm.position.set(-0.30, -0.17, 0.06);
+      rForearm.rotation.z = 0.08;
       rForearm.castShadow = true;
       scene.add(rForearm);
+
+      // Signer's left forearm → viewer's right
+      const lForearm = new THREE.Mesh(forearmGeo.clone(), skinArmMat);
+      lForearm.position.set( 0.30, -0.17, 0.06);
+      lForearm.rotation.z = -0.08;
+      lForearm.castShadow = true;
+      scene.add(lForearm);
 
       // ── Face ──────────────────────────────────────────────────────────
       face = new FaceModel();
@@ -214,17 +233,19 @@ export function SignAvatar({ currentWord, isRecording, signQueue }: SignAvatarPr
       face.applyExpression(NEUTRAL_FACE);
 
       // ── Hands ─────────────────────────────────────────────────────────
+      // Signer's right hand (HandModel isLeft=false) → viewer's LEFT (x < 0)
       rh = new HandModel(false);
-      rh.root.position.set( 0.30, -0.12, 0.18);
-      rh.root.rotation.set( 0.06, 0.12, 0);
+      rh.root.position.set(REST_R.x, REST_R.y, REST_R.z);
+      rh.root.rotation.set(0.06, -0.12, 0);
       rh.root.traverse(c => { if (c instanceof THREE.Mesh) c.castShadow = true; });
       rh.applyPose(IDLE_RIGHT);
       scene.add(rh.root);
       rightHandRef.current = rh;
 
+      // Signer's left hand (HandModel isLeft=true) → viewer's RIGHT (x > 0)
       lh = new HandModel(true);
-      lh.root.position.set(-0.30, -0.12, 0.18);
-      lh.root.rotation.set( 0.06, -0.12, 0);
+      lh.root.position.set(REST_L.x, REST_L.y, REST_L.z);
+      lh.root.rotation.set(0.06,  0.12, 0);
       lh.root.traverse(c => { if (c instanceof THREE.Mesh) c.castShadow = true; });
       lh.applyPose(IDLE_LEFT);
       scene.add(lh.root);
@@ -259,6 +280,9 @@ export function SignAvatar({ currentWord, isRecording, signQueue }: SignAvatarPr
           itemStartRef.current   = now;
         }
 
+        // Helper: lerp a single number
+        const lerpN = (a: number, b: number, t: number) => a + (b - a) * t;
+
         const cur = currentItemRef.current;
         if (cur) {
           // Lerp speed: fast approach (snappy but smooth)
@@ -266,6 +290,23 @@ export function SignAvatar({ currentWord, isRecording, signQueue }: SignAvatarPr
           rHand.lerpToPose(cur.right, lerpT);
           lHand.lerpToPose(cur.left,  lerpT);
           fc.lerpExpression(cur.face ?? NEUTRAL_FACE, lerpT);
+
+          // Lerp hand world positions toward target (REST + pose offset)
+          const posT = Math.min(dt / 70, 1);
+          const rTargX = REST_R.x + (cur.right.posX ?? 0);
+          const rTargY = REST_R.y + (cur.right.posY ?? 0);
+          const rTargZ = REST_R.z + (cur.right.posZ ?? 0);
+          rHand.root.position.x = lerpN(rHand.root.position.x, rTargX, posT);
+          rHand.root.position.y = lerpN(rHand.root.position.y, rTargY, posT);
+          rHand.root.position.z = lerpN(rHand.root.position.z, rTargZ, posT);
+
+          const lTargX = REST_L.x + (cur.left.posX ?? 0);
+          const lTargY = REST_L.y + (cur.left.posY ?? 0);
+          const lTargZ = REST_L.z + (cur.left.posZ ?? 0);
+          lHand.root.position.x = lerpN(lHand.root.position.x, lTargX, posT);
+          lHand.root.position.y = lerpN(lHand.root.position.y, lTargY, posT);
+          lHand.root.position.z = lerpN(lHand.root.position.z, lTargZ, posT);
+
           if (now - itemStartRef.current >= cur.holdMs) {
             currentItemRef.current = null;
           }
@@ -281,10 +322,17 @@ export function SignAvatar({ currentWord, isRecording, signQueue }: SignAvatarPr
           const sway = Math.sin(ts) * 0.018;
           const rise = Math.sin(ts * 0.72) * 0.006;
 
-          rHand.root.rotation.y =  0.12 + sway * 0.8;
-          lHand.root.rotation.y = -0.12 - sway * 0.8;
-          rHand.root.position.y = -0.12 + rise;
-          lHand.root.position.y = -0.12 + Math.sin(ts * 0.72 + 1.2) * 0.006;
+          // Return positions to rest, then apply sway on top
+          const posRetT = Math.min(dt / 180, 1);
+          rHand.root.position.x = lerpN(rHand.root.position.x, REST_R.x, posRetT);
+          rHand.root.position.y = lerpN(rHand.root.position.y, REST_R.y + rise, posRetT);
+          rHand.root.position.z = lerpN(rHand.root.position.z, REST_R.z, posRetT);
+          lHand.root.position.x = lerpN(lHand.root.position.x, REST_L.x, posRetT);
+          lHand.root.position.y = lerpN(lHand.root.position.y, REST_L.y + Math.sin(ts * 0.72 + 1.2) * 0.006, posRetT);
+          lHand.root.position.z = lerpN(lHand.root.position.z, REST_L.z, posRetT);
+
+          rHand.root.rotation.y = -0.12 + sway * 0.8;
+          lHand.root.rotation.y =  0.12 - sway * 0.8;
 
           // Subtle head micro-movements
           face.root.rotation.y = Math.sin(ts * 0.3) * 0.015;
