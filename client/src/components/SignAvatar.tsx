@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { HandModel, FaceModel } from '@/lib/three-hand';
 import { wordToSignQueue, NEUTRAL_FACE, OPEN, type FaceExpression, type HandPose } from '@/lib/asl-poses';
@@ -22,9 +22,8 @@ export function SignAvatar({ currentWord, isRecording, signQueue }: SignAvatarPr
   const leftHandRef = useRef<HandModel | null>(null);
   const faceRef = useRef<FaceModel | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
-  const sceneRef = useRef<THREE.Scene | null>(null);
-  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const rafRef = useRef<number>(0);
+  const [webglError, setWebglError] = useState<string | null>(null);
 
   const queueRef = useRef<QueueItem[]>([]);
   const currentItemRef = useRef<QueueItem | null>(null);
@@ -32,176 +31,184 @@ export function SignAvatar({ currentWord, isRecording, signQueue }: SignAvatarPr
   const lastWordRef = useRef<string>('');
   const blinkTimerRef = useRef<number>(0);
   const nextBlinkRef = useRef<number>(3000 + Math.random() * 2000);
+  const prevSignQueueRef = useRef<string[] | undefined>(undefined);
 
   // Build the Three.js scene once
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0d1117);
-    sceneRef.current = scene;
+    let renderer: THREE.WebGLRenderer;
+    let rh: HandModel;
+    let lh: HandModel;
+    let face: FaceModel;
+    let ro: ResizeObserver;
 
-    const w = canvas.clientWidth || 640;
-    const h = canvas.clientHeight || 400;
-    const camera = new THREE.PerspectiveCamera(42, w / h, 0.01, 10);
-    camera.position.set(0, 0.18, 1.15);
-    camera.lookAt(0, 0.08, 0);
-    cameraRef.current = camera;
+    try {
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x0d1117);
 
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.setSize(w, h, false);
-    renderer.shadowMap.enabled = true;
-    rendererRef.current = renderer;
+      const w = Math.max(canvas.clientWidth, 320);
+      const h = Math.max(canvas.clientHeight, 200);
+      const camera = new THREE.PerspectiveCamera(42, w / h, 0.01, 10);
+      camera.position.set(0, 0.18, 1.15);
+      camera.lookAt(0, 0.08, 0);
 
-    // Lighting
-    scene.add(new THREE.AmbientLight(0xfff5e0, 0.65));
-    const key = new THREE.DirectionalLight(0xfff3d0, 1.3);
-    key.position.set(0.6, 1.2, 1.5);
-    key.castShadow = true;
-    scene.add(key);
-    const fill = new THREE.DirectionalLight(0xd0e8ff, 0.45);
-    fill.position.set(-1.2, 0.5, 0.5);
-    scene.add(fill);
-    const rim = new THREE.DirectionalLight(0x8899ff, 0.25);
-    rim.position.set(0, -0.5, -2);
-    scene.add(rim);
+      renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'default' });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setSize(w, h, false);
+      renderer.shadowMap.enabled = true;
+      rendererRef.current = renderer;
 
-    // Background plane (gradient-ish)
-    const bgGeo = new THREE.PlaneGeometry(4, 4);
-    const bgMat = new THREE.MeshStandardMaterial({ color: 0x10181f });
-    const bg = new THREE.Mesh(bgGeo, bgMat);
-    bg.position.z = -0.6;
-    scene.add(bg);
+      // Lighting
+      scene.add(new THREE.AmbientLight(0xfff5e0, 0.65));
+      const key = new THREE.DirectionalLight(0xfff3d0, 1.3);
+      key.position.set(0.6, 1.2, 1.5);
+      key.castShadow = true;
+      scene.add(key);
+      const fill = new THREE.DirectionalLight(0xd0e8ff, 0.45);
+      fill.position.set(-1.2, 0.5, 0.5);
+      scene.add(fill);
+      const rim = new THREE.DirectionalLight(0x8899ff, 0.25);
+      rim.position.set(0, -0.5, -2);
+      scene.add(rim);
 
-    // Body (torso + neck)
-    const shMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.85 });
-    const skinMat = new THREE.MeshStandardMaterial({ color: 0xf0b080, roughness: 0.7 });
+      // Background plane
+      const bgGeo = new THREE.PlaneGeometry(4, 4);
+      const bgMat = new THREE.MeshStandardMaterial({ color: 0x10181f });
+      const bg = new THREE.Mesh(bgGeo, bgMat);
+      bg.position.z = -0.6;
+      scene.add(bg);
 
-    const torsoGeo = new THREE.CapsuleGeometry(0.15, 0.25, 4, 12);
-    const torso = new THREE.Mesh(torsoGeo, shMat);
-    torso.position.set(0, -0.12, -0.05);
-    scene.add(torso);
+      // Body materials
+      const shMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.85 });
+      const skinMat = new THREE.MeshStandardMaterial({ color: 0xf0b080, roughness: 0.7 });
 
-    const shGeo = new THREE.CapsuleGeometry(0.065, 0.6, 4, 12);
-    shGeo.rotateZ(Math.PI / 2);
-    const shoulders = new THREE.Mesh(shGeo, shMat);
-    shoulders.position.set(0, 0.13, -0.04);
-    scene.add(shoulders);
+      // Torso
+      const torsoGeo = new THREE.CapsuleGeometry(0.15, 0.25, 4, 12);
+      const torso = new THREE.Mesh(torsoGeo, shMat);
+      torso.position.set(0, -0.12, -0.05);
+      scene.add(torso);
 
-    const neckGeo = new THREE.CylinderGeometry(0.038, 0.048, 0.13, 10);
-    const neck = new THREE.Mesh(neckGeo, skinMat);
-    neck.position.set(0, 0.25, 0);
-    scene.add(neck);
+      // Shoulders
+      const shGeo = new THREE.CapsuleGeometry(0.065, 0.6, 4, 12);
+      shGeo.rotateZ(Math.PI / 2);
+      const shoulders = new THREE.Mesh(shGeo, shMat);
+      shoulders.position.set(0, 0.13, -0.04);
+      scene.add(shoulders);
 
-    // Face
-    const face = new FaceModel();
-    face.root.position.set(0, 0.47, 0.01);
-    scene.add(face.root);
-    faceRef.current = face;
-    face.applyExpression(NEUTRAL_FACE);
+      // Neck
+      const neckGeo = new THREE.CylinderGeometry(0.038, 0.048, 0.13, 10);
+      const neck = new THREE.Mesh(neckGeo, skinMat);
+      neck.position.set(0, 0.25, 0);
+      scene.add(neck);
 
-    // Hands
-    const rh = new HandModel(false);
-    rh.root.position.set(0.24, -0.1, 0.12);
-    rh.root.rotation.set(0.08, 0.15, 0);
-    rh.applyPose(OPEN);
-    scene.add(rh.root);
-    rightHandRef.current = rh;
+      // Face
+      face = new FaceModel();
+      face.root.position.set(0, 0.47, 0.01);
+      scene.add(face.root);
+      faceRef.current = face;
+      face.applyExpression(NEUTRAL_FACE);
 
-    const lh = new HandModel(true);
-    lh.root.position.set(-0.24, -0.1, 0.12);
-    lh.root.rotation.set(0.08, -0.15, 0);
-    lh.applyPose(OPEN);
-    scene.add(lh.root);
-    leftHandRef.current = lh;
+      // Hands
+      rh = new HandModel(false);
+      rh.root.position.set(0.24, -0.1, 0.12);
+      rh.root.rotation.set(0.08, 0.15, 0);
+      rh.applyPose(OPEN);
+      scene.add(rh.root);
+      rightHandRef.current = rh;
 
-    // Resize handling
-    const ro = new ResizeObserver(() => {
-      const cw = canvas.clientWidth;
-      const ch = canvas.clientHeight;
-      if (!cw || !ch) return;
-      renderer.setSize(cw, ch, false);
-      camera.aspect = cw / ch;
-      camera.updateProjectionMatrix();
-    });
-    ro.observe(canvas);
+      lh = new HandModel(true);
+      lh.root.position.set(-0.24, -0.1, 0.12);
+      lh.root.rotation.set(0.08, -0.15, 0);
+      lh.applyPose(OPEN);
+      scene.add(lh.root);
+      leftHandRef.current = lh;
 
-    let prev = performance.now();
-    const animate = (now: number) => {
-      rafRef.current = requestAnimationFrame(animate);
-      const dt = Math.min(now - prev, 50);
-      prev = now;
+      // Resize observer
+      ro = new ResizeObserver(() => {
+        const cw = canvas.clientWidth;
+        const ch = canvas.clientHeight;
+        if (!cw || !ch) return;
+        renderer.setSize(cw, ch, false);
+        camera.aspect = cw / ch;
+        camera.updateProjectionMatrix();
+      });
+      ro.observe(canvas);
 
-      const rHand = rightHandRef.current;
-      const lHand = leftHandRef.current;
-      const fc = faceRef.current;
-      if (!rHand || !lHand || !fc) return;
+      let prev = performance.now();
+      const animate = (now: number) => {
+        rafRef.current = requestAnimationFrame(animate);
+        const dt = Math.min(now - prev, 50);
+        prev = now;
 
-      // Advance queue
-      const queue = queueRef.current;
-      if (!currentItemRef.current && queue.length > 0) {
-        currentItemRef.current = queue.shift()!;
-        itemStartRef.current = now;
-      }
+        const rHand = rightHandRef.current;
+        const lHand = leftHandRef.current;
+        const fc = faceRef.current;
+        if (!rHand || !lHand || !fc) return;
 
-      const cur = currentItemRef.current;
-      if (cur) {
-        const elapsed = now - itemStartRef.current;
-        const lerpT = Math.min(dt / 70, 1);
-        rHand.lerpToPose(cur.right, lerpT);
-        lHand.lerpToPose(cur.left, lerpT);
-        fc.lerpExpression(cur.face, lerpT);
-
-        if (elapsed >= cur.holdMs) {
-          currentItemRef.current = null;
+        // Advance queue
+        if (!currentItemRef.current && queueRef.current.length > 0) {
+          currentItemRef.current = queueRef.current.shift()!;
+          itemStartRef.current = now;
         }
-      } else {
-        // Idle drift to open
-        const idleT = Math.min(dt / 250, 1);
-        rHand.lerpToPose(OPEN, idleT);
-        lHand.lerpToPose(OPEN, idleT);
-        fc.lerpExpression(NEUTRAL_FACE, idleT);
 
-        // Gentle idle hand sway
-        const ts = now * 0.0007;
-        rHand.root.rotation.y = 0.15 + Math.sin(ts) * 0.025;
-        lHand.root.rotation.y = -0.15 - Math.sin(ts) * 0.025;
-        rHand.root.position.y = -0.1 + Math.sin(ts * 0.8) * 0.005;
-        lHand.root.position.y = -0.1 + Math.sin(ts * 0.8 + 1) * 0.005;
-      }
+        const cur = currentItemRef.current;
+        if (cur) {
+          const elapsed = now - itemStartRef.current;
+          const lerpT = Math.min(dt / 70, 1);
+          rHand.lerpToPose(cur.right, lerpT);
+          lHand.lerpToPose(cur.left, lerpT);
+          fc.lerpExpression(cur.face, lerpT);
+          if (elapsed >= cur.holdMs) {
+            currentItemRef.current = null;
+          }
+        } else {
+          // Idle drift to neutral
+          const idleT = Math.min(dt / 250, 1);
+          rHand.lerpToPose(OPEN, idleT);
+          lHand.lerpToPose(OPEN, idleT);
+          fc.lerpExpression(NEUTRAL_FACE, idleT);
+          // Gentle sway
+          const ts = now * 0.0007;
+          rHand.root.rotation.y = 0.15 + Math.sin(ts) * 0.025;
+          lHand.root.rotation.y = -0.15 - Math.sin(ts) * 0.025;
+          rHand.root.position.y = -0.1 + Math.sin(ts * 0.8) * 0.005;
+          lHand.root.position.y = -0.1 + Math.sin(ts * 0.8 + 1) * 0.005;
+        }
 
-      // Auto blink
-      blinkTimerRef.current += dt;
-      if (blinkTimerRef.current >= nextBlinkRef.current) {
-        blinkTimerRef.current = 0;
-        nextBlinkRef.current = 2500 + Math.random() * 4000;
-        fc.applyExpression({ ...NEUTRAL_FACE, eyeSquint: 1 });
-        setTimeout(() => { faceRef.current?.applyExpression(NEUTRAL_FACE); }, 110);
-      }
+        // Auto blink
+        blinkTimerRef.current += dt;
+        if (blinkTimerRef.current >= nextBlinkRef.current) {
+          blinkTimerRef.current = 0;
+          nextBlinkRef.current = 2500 + Math.random() * 4000;
+          fc.applyExpression({ ...NEUTRAL_FACE, eyeSquint: 1 });
+          setTimeout(() => { faceRef.current?.applyExpression(NEUTRAL_FACE); }, 110);
+        }
 
-      renderer.render(scene, camera);
-    };
-    rafRef.current = requestAnimationFrame(animate);
+        renderer.render(scene, camera);
+      };
+      rafRef.current = requestAnimationFrame(animate);
+
+    } catch (err) {
+      console.error('SignAvatar 3D initialization failed:', err);
+      setWebglError(err instanceof Error ? err.message : 'Failed to initialize 3D view');
+    }
 
     return () => {
-      ro.disconnect();
+      if (ro!) ro.disconnect();
       cancelAnimationFrame(rafRef.current);
-      rh.dispose();
-      lh.dispose();
-      face.dispose();
-      renderer.dispose();
+      if (rh!) { rh.dispose(); rightHandRef.current = null; }
+      if (lh!) { lh.dispose(); leftHandRef.current = null; }
+      if (face!) { face.dispose(); faceRef.current = null; }
+      if (renderer!) { renderer.dispose(); rendererRef.current = null; }
     };
   }, []);
 
-  // Sign finalized words when they arrive (the signQueue prop changes identity on each new batch)
-  const prevSignQueueRef = useRef<string[] | undefined>(undefined);
+  // Sign finalized words when they arrive
   useEffect(() => {
-    // Only process if this is a genuinely new batch (identity check)
     if (!signQueue?.length || signQueue === prevSignQueueRef.current) return;
     prevSignQueueRef.current = signQueue;
-    // Clear any leftover queue so new words start promptly
     queueRef.current = [];
     currentItemRef.current = null;
     signQueue.forEach(word => {
@@ -218,9 +225,27 @@ export function SignAvatar({ currentWord, isRecording, signQueue }: SignAvatarPr
     }
   }, [isRecording]);
 
+  if (webglError) {
+    return (
+      <div
+        className="relative w-full rounded-2xl overflow-hidden border border-white/10 flex items-center justify-center bg-[#0d1117]"
+        style={{ aspectRatio: '16/10' }}
+        data-testid="sign-avatar-container"
+      >
+        <div className="text-center px-8">
+          <p className="text-white/40 text-sm mb-2">3D avatar unavailable</p>
+          <p className="text-white/20 text-xs">{webglError}</p>
+          <p className="text-white/30 text-sm mt-4 font-medium">
+            {currentWord && <span className="text-white/60 uppercase tracking-widest">{currentWord}</span>}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
-      className="relative w-full rounded-2xl overflow-hidden border border-white/8"
+      className="relative w-full rounded-2xl overflow-hidden border border-white/10"
       style={{ aspectRatio: '16/10', background: '#0d1117' }}
       data-testid="sign-avatar-container"
     >
