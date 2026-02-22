@@ -189,10 +189,8 @@ export function SignAvatar({ currentWord, isRecording, signQueue }: SignAvatarPr
       scene.add(rArmGroup);
 
       // Forearms (skin)
-      const skinArmMat = new THREE.MeshPhysicalMaterial({
-        color: 0xf0b080, roughness: 0.68, metalness: 0,
-        clearcoat: 0.08, clearcoatRoughness: 0.9,
-        sheen: 0.1, sheenRoughness: 0.9,
+      const skinArmMat = new THREE.MeshStandardMaterial({
+        color: 0xc8855a, roughness: 0.68, metalness: 0,
       });
       const forearmGeo = new THREE.CapsuleGeometry(0.040, 0.20, 4, 10);
       const lForearm = new THREE.Mesh(forearmGeo, skinArmMat);

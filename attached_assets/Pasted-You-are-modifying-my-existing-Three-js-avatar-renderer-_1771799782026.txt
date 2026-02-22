@@ -1,0 +1,387 @@
+You are modifying my existing Three.js avatar renderer.
+
+Objective:
+Replace the current blocky hands with “semi-realistic” rounded hands (or a Pinocchio-style fallback) WITHOUT changing the ASL translation pipeline or animation data.
+
+Constraints:
+- Do NOT change how signs are generated.
+- Only change rendering of hands.
+- Must work even if we cannot easily replace skinned meshes.
+- Prefer a bone-driven approach: attach new meshes to existing hand/finger bones.
+- Hide the old hand meshes so only the new hands are visible.
+
+Tasks:
+1) Find where the avatar/scene is loaded (GLTFLoader/useGLTF/VRM loader, etc.).
+2) After the model is loaded and added to scene, call an `upgradeHands(modelScene)` function.
+3) Create a new file `src/graphics/upgradeHands.ts` (or .js if project is JS) containing the implementation provided below.
+4) In `upgradeHands`:
+   - Traverse the loaded model to find bones (object.isBone).
+   - Auto-detect Left/Right wrist/hand bones and finger bones using common naming patterns (Left/Right, L/R, thumb/index/middle/ring/pinky, 1/2/3).
+   - Hide existing hand meshes whose names include “hand”, “palm”, “finger” for each side (but do not hide arms).
+   - Attach a rounded palm (RoundedBox or smooth Box) to each wrist/hand bone.
+   - For each detected finger bone segment, attach a capsule/cylinder segment oriented toward its child bone (compute bone-to-child direction).
+   - Set MeshStandardMaterial and enable castShadow/receiveShadow if shadows are enabled.
+   - If finger bones cannot be detected, attach a simple stylized Pinocchio hand (palm + 5 cylinders) to the wrist bone in a neutral pose.
+5) Improve lighting minimally (if there’s no directional light): add an AmbientLight + DirectionalLight so the new geometry reads well.
+
+Acceptance:
+- The hands no longer look like cubes.
+- Fingers look rounded and proportionate.
+- Existing sign animations still move the fingers if finger bones exist.
+- No runtime errors.
+B) Drop-in module: upgradeHands.ts (Three.js)
+
+If your project is JS, rename to upgradeHands.js and remove TypeScript types.
+
+import * as THREE from "three";
+// If your bundler supports Three examples:
+import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
+
+type Side = "left" | "right";
+type Finger = "thumb" | "index" | "middle" | "ring" | "pinky";
+
+type UpgradeHandsOptions = {
+  style?: "realistic" | "pinocchio";
+  palmScale?: number;      // overall palm size multiplier
+  fingerRadius?: number;   // base finger thickness
+  palmRoundness?: number;  // 0..1-ish
+  hideOldHands?: boolean;
+  debug?: boolean;
+};
+
+const DEFAULTS: Required<UpgradeHandsOptions> = {
+  style: "realistic",
+  palmScale: 1.0,
+  fingerRadius: 0.012,
+  palmRoundness: 0.22,
+  hideOldHands: true,
+  debug: false,
+};
+
+function normName(s: string) {
+  return s.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function detectSide(name: string): Side | null {
+  const n = normName(name);
+  // common patterns: Left, Right, .L, .R, _L_, _R_, lhand/rhand
+  if (n.includes("left") || n.endsWith("l") || n.includes("lhand") || n.includes("handl")) return "left";
+  if (n.includes("right") || n.endsWith("r") || n.includes("rhand") || n.includes("handr")) return "right";
+  return null;
+}
+
+function detectFinger(name: string): Finger | null {
+  const n = normName(name);
+  if (n.includes("thumb")) return "thumb";
+  if (n.includes("index") || n.includes("pointer")) return "index";
+  if (n.includes("middle")) return "middle";
+  if (n.includes("ring")) return "ring";
+  if (n.includes("pinky") || n.includes("little")) return "pinky";
+  return null;
+}
+
+function detectSegmentIndex(name: string): number {
+  // Prefer explicit digits 1/2/3/4
+  const m = name.match(/(\d+)/);
+  if (m) return Math.max(1, Math.min(4, parseInt(m[1], 10)));
+
+  const n = normName(name);
+  // Common bone naming
+  if (n.includes("metacarpal")) return 1;
+  if (n.includes("proximal")) return 1;
+  if (n.includes("intermediate") || n.includes("middle")) return 2;
+  if (n.includes("distal") || n.includes("tip")) return 3;
+
+  // Unknown -> treat as 1
+  return 1;
+}
+
+function isLikelyWristOrHandBone(b: THREE.Bone) {
+  const n = normName(b.name);
+  const hasHand = n.includes("hand") || n.includes("wrist");
+  const hasFinger = detectFinger(b.name) !== null;
+  return hasHand && !hasFinger;
+}
+
+function firstBoneChild(bone: THREE.Bone): THREE.Bone | null {
+  for (const c of bone.children) {
+    if ((c as any).isBone) return c as THREE.Bone;
+  }
+  return null;
+}
+
+function boneLocalLength(bone: THREE.Bone, fallback: number) {
+  const child = firstBoneChild(bone);
+  if (!child) return fallback;
+  const len = child.position.length();
+  return len > 1e-6 ? len : fallback;
+}
+
+function makeMaterial(style: "realistic" | "pinocchio") {
+  if (style === "pinocchio") {
+    return new THREE.MeshStandardMaterial({
+      color: new THREE.Color(0xd2a46f), // warm wood
+      roughness: 0.55,
+      metalness: 0.0,
+    });
+  }
+  return new THREE.MeshStandardMaterial({
+    color: new THREE.Color(0xe3bfa7), // skin-ish
+    roughness: 0.7,
+    metalness: 0.0,
+  });
+}
+
+function makeFingerSegmentMesh(
+  radius: number,
+  length: number,
+  material: THREE.Material
+) {
+  // CapsuleGeometry isn’t guaranteed in every Three build, so use cylinder + spheres.
+  const group = new THREE.Group();
+
+  const cylLen = Math.max(0.001, length - radius * 2);
+  const cylinder = new THREE.Mesh(
+    new THREE.CylinderGeometry(radius, radius, cylLen, 10, 1, true),
+    material
+  );
+  // Cylinder is centered; move it so the segment starts near joint and extends toward child
+  cylinder.position.y = radius + cylLen / 2;
+
+  const s1 = new THREE.Mesh(new THREE.SphereGeometry(radius, 10, 10), material);
+  s1.position.y = radius;
+
+  const s2 = new THREE.Mesh(new THREE.SphereGeometry(radius, 10, 10), material);
+  s2.position.y = radius + cylLen;
+
+  group.add(cylinder, s1, s2);
+  return group;
+}
+
+function orientSegmentTowardChild(bone: THREE.Bone, segGroup: THREE.Object3D, length: number) {
+  const child = firstBoneChild(bone);
+  if (!child) return;
+
+  const dir = child.position.clone();
+  if (dir.lengthSq() < 1e-10) return;
+
+  dir.normalize();
+
+  // rotate from +Y (our segment axis) to dir
+  const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+  segGroup.quaternion.copy(q);
+
+  // position it halfway along direction
+  segGroup.position.copy(dir.multiplyScalar(length * 0.0)); 
+  // NOTE: we already offset geometry inside the group so it grows from the joint.
+}
+
+function hideOldHandMeshes(root: THREE.Object3D, side: Side, debug = false) {
+  const sideToken = side === "left" ? "left" : "right";
+  root.traverse((o) => {
+    const n = normName(o.name);
+    if (!(o as any).isMesh) return;
+
+    // Heuristic: hide meshes that look like hands/fingers/palms for that side
+    const looksLikeHand = n.includes("hand") || n.includes("palm") || n.includes("finger");
+    const matchesSide =
+      n.includes(sideToken) ||
+      (side === "left" && (n.endsWith("l") || n.includes("lhand"))) ||
+      (side === "right" && (n.endsWith("r") || n.includes("rhand")));
+
+    if (looksLikeHand && matchesSide) {
+      (o as THREE.Mesh).visible = false;
+      if (debug) console.log("[upgradeHands] hiding mesh:", o.name);
+    }
+  });
+}
+
+function findAllBones(root: THREE.Object3D): THREE.Bone[] {
+  const bones: THREE.Bone[] = [];
+  root.traverse((o) => {
+    if ((o as any).isBone) bones.push(o as THREE.Bone);
+  });
+  return bones;
+}
+
+function pickWristBone(bones: THREE.Bone[], side: Side): THREE.Bone | null {
+  // Prefer “wrist” in name, otherwise a hand bone that’s not a finger bone.
+  const sideBones = bones.filter((b) => detectSide(b.name) === side);
+
+  const wrist = sideBones.find((b) => normName(b.name).includes("wrist"));
+  if (wrist) return wrist;
+
+  const hand = sideBones.find((b) => isLikelyWristOrHandBone(b));
+  return hand ?? null;
+}
+
+function collectFingerBones(bones: THREE.Bone[], side: Side) {
+  const out: Record<Finger, THREE.Bone[]> = {
+    thumb: [],
+    index: [],
+    middle: [],
+    ring: [],
+    pinky: [],
+  };
+
+  const sideBones = bones.filter((b) => detectSide(b.name) === side);
+
+  for (const b of sideBones) {
+    const f = detectFinger(b.name);
+    if (!f) continue;
+    out[f].push(b);
+  }
+
+  // Sort each finger by segment index so we attach consistent thickness/length
+  (Object.keys(out) as Finger[]).forEach((f) => {
+    out[f].sort((a, b) => detectSegmentIndex(a.name) - detectSegmentIndex(b.name));
+  });
+
+  return out;
+}
+
+function makePalmMesh(material: THREE.Material, palmScale: number, roundness: number) {
+  // A small rounded box. You’ll tweak these numbers once by eye.
+  const w = 0.08 * palmScale;
+  const h = 0.02 * palmScale;
+  const d = 0.09 * palmScale;
+
+  const geo = new RoundedBoxGeometry(w, h, d, 3, Math.min(w, h, d) * roundness);
+  const mesh = new THREE.Mesh(geo, material);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+
+  // Position relative to wrist joint (depends on skeleton, but this is usually “good enough”)
+  mesh.position.set(0, 0.01 * palmScale, 0.02 * palmScale);
+  return mesh;
+}
+
+function attachStylizedFallbackHand(wrist: THREE.Bone, material: THREE.Material, side: Side, opts: Required<UpgradeHandsOptions>) {
+  const g = new THREE.Group();
+  g.name = `FallbackHand_${side}`;
+
+  const palm = makePalmMesh(material, opts.palmScale * 0.95, opts.palmRoundness * 0.9);
+  g.add(palm);
+
+  // Simple finger cylinders in a relaxed “open” pose (Pinocchio-ish)
+  const baseX = side === "left" ? -1 : 1;
+
+  const fingerPositions = [
+    { name: "thumb",  x: 0.03 * baseX, z: 0.03, rotZ:  0.7 * baseX },
+    { name: "index",  x: 0.02 * baseX, z: 0.05, rotZ:  0.10 * baseX },
+    { name: "middle", x: 0.00,         z: 0.055, rotZ: 0.00 },
+    { name: "ring",   x: -0.02 * baseX, z: 0.05, rotZ: -0.08 * baseX },
+    { name: "pinky",  x: -0.035 * baseX, z: 0.04, rotZ: -0.18 * baseX },
+  ];
+
+  for (const fp of fingerPositions) {
+    const seg = makeFingerSegmentMesh(opts.fingerRadius * 0.9, 0.045 * opts.palmScale, material);
+    seg.position.set(fp.x, 0.015 * opts.palmScale, fp.z);
+    seg.rotation.z = fp.rotZ;
+    g.add(seg);
+  }
+
+  wrist.add(g);
+}
+
+export function upgradeHands(modelRoot: THREE.Object3D, options: UpgradeHandsOptions = {}) {
+  const opts = { ...DEFAULTS, ...options };
+  const bones = findAllBones(modelRoot);
+
+  if (opts.debug) {
+    console.log("[upgradeHands] bone count:", bones.length);
+    console.log("[upgradeHands] sample bone names:", bones.slice(0, 30).map((b) => b.name));
+  }
+
+  const mat = makeMaterial(opts.style);
+
+  (["left", "right"] as Side[]).forEach((side) => {
+    const wrist = pickWristBone(bones, side);
+
+    if (opts.hideOldHands) hideOldHandMeshes(modelRoot, side, opts.debug);
+
+    if (!wrist) {
+      if (opts.debug) console.warn(`[upgradeHands] No wrist/hand bone detected for ${side}`);
+      return;
+    }
+
+    const fingerBones = collectFingerBones(bones, side);
+    const totalFingerBones =
+      fingerBones.thumb.length +
+      fingerBones.index.length +
+      fingerBones.middle.length +
+      fingerBones.ring.length +
+      fingerBones.pinky.length;
+
+    // Always attach a nicer palm to the wrist/hand bone
+    const palm = makePalmMesh(mat, opts.palmScale, opts.palmRoundness);
+    palm.name = `Palm_${side}`;
+    wrist.add(palm);
+
+    if (totalFingerBones === 0) {
+      // Fallback if no finger bones exist / detected
+      if (opts.debug) console.warn(`[upgradeHands] No finger bones detected for ${side}. Using fallback hand.`);
+      attachStylizedFallbackHand(wrist, mat, side, opts);
+      return;
+    }
+
+    // Attach a segment mesh to each finger bone (bone-driven, no skinning)
+    (Object.keys(fingerBones) as Finger[]).forEach((finger) => {
+      fingerBones[finger].forEach((b, idx) => {
+        // thickness taper
+        const taper = finger === "thumb" ? 1.05 : 1.0;
+        const radius = opts.fingerRadius * taper * (idx === 0 ? 1.05 : idx === 1 ? 0.95 : 0.85);
+
+        const len = boneLocalLength(b, 0.025);
+        const seg = makeFingerSegmentMesh(radius, len, mat);
+        seg.name = `FingerSeg_${side}_${finger}_${idx + 1}`;
+        seg.castShadow = true;
+        seg.receiveShadow = true;
+
+        orientSegmentTowardChild(b, seg, len);
+        b.add(seg);
+      });
+    });
+  });
+
+  // Minimal lighting helper: only if scene is very flat.
+  // (If you already have lights, keep them.)
+  const scene = modelRoot.parent;
+  if (scene && (scene as any).isScene) {
+    const hasDirectional = (scene as THREE.Scene).children.some((c) => (c as any).isDirectionalLight);
+    const hasAmbient = (scene as THREE.Scene).children.some((c) => (c as any).isAmbientLight);
+
+    if (!hasAmbient) {
+      const amb = new THREE.AmbientLight(0xffffff, 0.35);
+      amb.name = "upgradeHands_Ambient";
+      (scene as THREE.Scene).add(amb);
+    }
+    if (!hasDirectional) {
+      const dir = new THREE.DirectionalLight(0xffffff, 0.9);
+      dir.name = "upgradeHands_Directional";
+      dir.position.set(2, 4, 3);
+      dir.castShadow = true;
+      (scene as THREE.Scene).add(dir);
+    }
+  }
+
+  return modelRoot;
+}
+C) One-line integration (wherever you load the avatar)
+
+Find the code where you do something like:
+
+gltfLoader.load(... => scene.add(gltf.scene))
+
+or const { scene } = useGLTF(...)
+
+or VRM load callback
+
+Then add:
+
+import { upgradeHands } from "./graphics/upgradeHands";
+
+// after model loads:
+upgradeHands(gltf.scene, { style: "realistic", debug: false });
+// or:
+upgradeHands(gltf.scene, { style: "pinocchio" });

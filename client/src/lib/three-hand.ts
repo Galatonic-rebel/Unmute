@@ -1,254 +1,199 @@
 import * as THREE from 'three';
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import type { HandPose, FaceExpression } from './asl-poses';
 
-// ─────────────────────────────────────────────────────────────
-// Color palette
-// ─────────────────────────────────────────────────────────────
-const SKIN_MID   = new THREE.Color(0xd4956a);
-const SKIN_LIGHT = new THREE.Color(0xe8b98a);
-const SKIN_DARK  = new THREE.Color(0xb87348);
-const NAIL_COL   = new THREE.Color(0xefd0b8);
-const HAIR_COL   = new THREE.Color(0x2c1a10);
-const LIP_COL    = new THREE.Color(0xb86060);
-const EYE_WHITE  = new THREE.Color(0xfefefe);
-const IRIS_COL   = new THREE.Color(0x4a72aa);
-const PUPIL_COL  = new THREE.Color(0x0e0808);
+// ─── Skin palette ─────────────────────────────────────────────────────────────
+const SKIN    = new THREE.Color(0xc8855a);
+const SKIN_LT = new THREE.Color(0xdda070);
+const SKIN_DK = new THREE.Color(0xa06038);
+const NAIL    = new THREE.Color(0xe8c4a8);
+const LIP     = new THREE.Color(0xb06060);
+const HAIR    = new THREE.Color(0x2a1808);
+const EYE_W   = new THREE.Color(0xfdfdfd);
+const IRIS    = new THREE.Color(0x3a6090);
+const PUPIL   = new THREE.Color(0x0d0608);
 
-// ─────────────────────────────────────────────────────────────
-// Materials
-// ─────────────────────────────────────────────────────────────
-function makeSkinMat(col: THREE.Color, rough = 0.72): THREE.MeshPhysicalMaterial {
-  return new THREE.MeshPhysicalMaterial({
-    color:              col,
-    roughness:          rough,
-    metalness:          0,
-    clearcoat:          0.15,
-    clearcoatRoughness: 0.80,
-    sheen:              0.18,
-    sheenRoughness:     0.85,
-    sheenColor:         new THREE.Color(0xff5533),
-  });
+// ─── Materials ────────────────────────────────────────────────────────────────
+function skinMat(col = SKIN, rough = 0.68) {
+  return new THREE.MeshStandardMaterial({ color: col, roughness: rough, metalness: 0 });
 }
 
-// ─────────────────────────────────────────────────────────────
-// Rounded-box geometry  (single smooth mesh – no visible corners)
-// ─────────────────────────────────────────────────────────────
-function makeRoundedBox(
-  w: number, h: number, d: number,
-  radius: number, segs = 7
-): THREE.BufferGeometry {
-  const geo = new THREE.BoxGeometry(w, h, d, segs * 2, segs * 3, segs);
-  const pos = geo.attributes.position;
-  const hw = w / 2 - radius;
-  const hh = h / 2 - radius;
-  const hd = d / 2 - radius;
-  for (let i = 0; i < pos.count; i++) {
-    const x = pos.getX(i);
-    const y = pos.getY(i);
-    const z = pos.getZ(i);
-    const cx = Math.max(-hw, Math.min(hw, x));
-    const cy = Math.max(-hh, Math.min(hh, y));
-    const cz = Math.max(-hd, Math.min(hd, z));
-    const dx = x - cx, dy = y - cy, dz = z - cz;
-    const len = Math.sqrt(dx * dx + dy * dy + dz * dz) || 0.0001;
-    pos.setXYZ(i,
-      cx + (dx / len) * radius,
-      cy + (dy / len) * radius,
-      cz + (dz / len) * radius
-    );
+const SHARED_SKIN    = skinMat(SKIN,    0.68);
+const SHARED_SKIN_DK = skinMat(SKIN_DK, 0.72);
+const SHARED_NAIL    = skinMat(NAIL,    0.30);
+
+// ─── Geometry helpers ─────────────────────────────────────────────────────────
+
+/** Open cylinder + two sphere caps → seamless capsule-like segment.
+ *  The geometry base sits at y = 0; tip at y = length.
+ */
+function makeSegmentGeo(rBase: number, rTip: number, length: number) {
+  const RAD = 14;
+  const group = new THREE.Group();
+
+  // Cylinder body (open-ended so no flat discs)
+  if (length > 0.001) {
+    const cylGeo = new THREE.CylinderGeometry(rTip, rBase, length, RAD, 1, true);
+    cylGeo.translate(0, length / 2, 0);
+    group.add(new THREE.Mesh(cylGeo, SHARED_SKIN));
   }
-  pos.needsUpdate = true;
-  geo.computeVertexNormals();
-  return geo;
+
+  // Base hemisphere (spheroid slightly flattened toward palm)
+  const botGeo = new THREE.SphereGeometry(rBase, RAD, 10, 0, Math.PI * 2, Math.PI * 0.5, Math.PI * 0.5);
+  botGeo.translate(0, 0, 0);
+  group.add(new THREE.Mesh(botGeo, SHARED_SKIN));
+
+  // Tip hemisphere (full sphere – acts as cap and next-segment overlap)
+  const topGeo = new THREE.SphereGeometry(rTip, RAD, 10);
+  topGeo.translate(0, length, 0);
+  group.add(new THREE.Mesh(topGeo, SHARED_SKIN));
+
+  return group;
 }
 
-// ─────────────────────────────────────────────────────────────
-// Capsule with base at y=0
-// ─────────────────────────────────────────────────────────────
-function capsule(r: number, len: number, capSegs = 4, radSegs = 18): THREE.BufferGeometry {
-  const g = new THREE.CapsuleGeometry(r, len, capSegs, radSegs);
-  g.translate(0, len / 2 + r, 0);
-  return g;
-}
-
-// ─────────────────────────────────────────────────────────────
-// Finger anatomy  (lengths & radii in metres)
-// ─────────────────────────────────────────────────────────────
-const SEG_LENGTHS: Record<string, [number, number, number]> = {
-  thumb:  [0.038, 0.028, 0.022],
-  index:  [0.068, 0.046, 0.028],
-  middle: [0.076, 0.052, 0.032],
-  ring:   [0.072, 0.050, 0.030],
-  pinky:  [0.052, 0.032, 0.022],
+// ─── Finger anatomy constants ─────────────────────────────────────────────────
+// Each finger: [proxLength, midLength, distLength]  (metres)
+const F_LEN: Record<string, [number, number, number]> = {
+  thumb:  [0.040, 0.030, 0.024],
+  index:  [0.048, 0.034, 0.022],
+  middle: [0.054, 0.038, 0.024],
+  ring:   [0.050, 0.036, 0.022],
+  pinky:  [0.036, 0.024, 0.016],
 };
 
-const SEG_RADII: Record<string, [number, number, number]> = {
-  thumb:  [0.0118, 0.0104, 0.0090],
-  index:  [0.0102, 0.0090, 0.0078],
-  middle: [0.0108, 0.0096, 0.0082],
-  ring:   [0.0100, 0.0088, 0.0076],
-  pinky:  [0.0085, 0.0073, 0.0062],
+// Each finger: [proxRadius, midRadius, distRadius]
+const F_RAD: Record<string, [number, number, number]> = {
+  thumb:  [0.0155, 0.0135, 0.0115],
+  index:  [0.0135, 0.0118, 0.0100],
+  middle: [0.0142, 0.0124, 0.0105],
+  ring:   [0.0132, 0.0115, 0.0098],
+  pinky:  [0.0108, 0.0094, 0.0080],
 };
 
-// MCP attachment points on palm (right-hand reference)
-const MCP_POS: Record<string, [number, number, number]> = {
-  thumb:  [-0.080,  0.030, 0.004],
-  index:  [-0.046,  0.090, 0.002],
-  middle: [-0.005,  0.100, 0.002],
-  ring:   [ 0.036,  0.091, 0.002],
-  pinky:  [ 0.071,  0.077, 0.002],
+// MCP position on palm (right-hand; flipped for left)
+const MCP_POS: Record<string, THREE.Vector3> = {
+  thumb:  new THREE.Vector3(-0.082,  0.028, 0.006),
+  index:  new THREE.Vector3(-0.048,  0.092, 0.004),
+  middle: new THREE.Vector3(-0.006,  0.102, 0.004),
+  ring:   new THREE.Vector3( 0.036,  0.093, 0.004),
+  pinky:  new THREE.Vector3( 0.073,  0.078, 0.004),
 };
 
 const REST_FLEX: Record<string, number> = {
-  thumb: -0.10, index: 0.04, middle: 0.02, ring: -0.02, pinky: -0.05,
+  thumb: -0.08, index: 0.04, middle: 0.02, ring: -0.02, pinky: -0.05,
 };
 
 const REST_SPLAY: Record<string, number> = {
-  thumb: -0.55, index: -0.12, middle: 0.00, ring: 0.10, pinky: 0.21,
+  thumb: -0.52, index: -0.10, middle: 0.00, ring: 0.09, pinky: 0.20,
 };
 
-// ─────────────────────────────────────────────────────────────
-// Finger builder – smooth segments, NO separate knuckle spheres
-// Segments overlap at joints so rounded ends blend together
-// ─────────────────────────────────────────────────────────────
-interface FingerJoints {
-  metacarpal: THREE.Group;
-  mcp:        THREE.Group;
-  pip:        THREE.Group;
-  dip:        THREE.Group;
+// ─── Joint group structure ────────────────────────────────────────────────────
+interface FingerRig {
+  meta: THREE.Group; // attached to palm
+  mcp:  THREE.Group; // splay + base flex
+  pip:  THREE.Group; // middle joint
+  dip:  THREE.Group; // tip joint
 }
 
-function buildFinger(
-  name: string,
-  skinMat: THREE.Material,
-  nailMat: THREE.Material
-): FingerJoints {
-  const [proxL, midL, distL] = SEG_LENGTHS[name];
-  const [proxR, midR, distR] = SEG_RADII[name];
+function buildFinger(name: string): FingerRig {
+  const [pL, mL, dL] = F_LEN[name];
+  const [pR, mR, dR] = F_RAD[name];
 
-  // Each segment is a single capsule – rounded ends naturally form the joint shape
-  const proxMesh = new THREE.Mesh(capsule(proxR, proxL), skinMat);
-  const midMesh  = new THREE.Mesh(capsule(midR,  midL),  skinMat);
-  const distMesh = new THREE.Mesh(capsule(distR, distL), skinMat);
+  // ── Proximal phalanx segment ──
+  // Tip sphere radius = mR so the spheres at the joint share the same size → seamless blend
+  const proxGrp = makeSegmentGeo(pR, mR, pL);
 
-  // ── Nail – thin curved disc on dorsal fingertip ──
-  const nailGeo = new THREE.SphereGeometry(distR * 0.98, 12, 6, 0, Math.PI * 2, 0, Math.PI * 0.42);
-  nailGeo.rotateX(Math.PI * 0.5);
-  nailGeo.scale(0.88, 0.52, 1.05);
-  const nail = new THREE.Mesh(nailGeo, nailMat);
-  nail.position.set(0, distL + distR * 1.55, -distR * 0.28);
+  // ── Middle phalanx segment ──
+  // Base sphere at y=0 of pip overlaps tip sphere of prox (both radius mR)
+  const midGrp = makeSegmentGeo(mR, dR, mL);
 
-  // ── DIP – pivot at top of middle phalanx ──
-  // Segments overlap by 1×radius so the capsule roundings merge smoothly
+  // ── Distal phalanx segment ──
+  const distGrp = makeSegmentGeo(dR, dR * 0.86, dL);
+
+  // ── Nail ──
+  const nailGeo = new THREE.SphereGeometry(dR * 0.92, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.46);
+  nailGeo.applyMatrix4(new THREE.Matrix4().makeScale(0.82, 0.48, 1.04));
+  nailGeo.translate(0, dL + dR * 1.2, -dR * 0.30);
+  const nail = new THREE.Mesh(nailGeo, SHARED_NAIL);
+
+  // ── DIP joint ──
+  // Position: tip-sphere of mid segment (center at y = mL, radius mR) sits at same location as
+  // base-sphere of dist segment (center at y = 0, radius dR ≈ mR-1) → nearly coincident → seamless
   const dip = new THREE.Group();
-  dip.position.set(0, midL + midR * 1.05, 0);
-  dip.add(distMesh, nail);
+  dip.position.y = mL;     // place at top-sphere centre of middle segment
+  dip.add(distGrp, nail);
 
-  // ── PIP ──
+  // ── PIP joint ──
   const pip = new THREE.Group();
-  pip.position.set(0, proxL + proxR * 1.05, 0);
-  pip.add(midMesh, dip);
+  pip.position.y = pL;     // place at top-sphere centre of proximal segment
+  pip.add(midGrp, dip);
 
   // ── MCP ──
   const mcp = new THREE.Group();
-  mcp.add(proxMesh, pip);
+  mcp.add(proxGrp, pip);
 
-  const metacarpal = new THREE.Group();
-  metacarpal.add(mcp);
+  const meta = new THREE.Group();
+  meta.add(mcp);
 
-  return { metacarpal, mcp, pip, dip };
+  return { meta, mcp, pip, dip };
 }
 
-// ─────────────────────────────────────────────────────────────
-// Organic palm  – single rounded-box slab + 2 muscle ellipsoids
-// Result: ONE dominant shape with subtle organic bumps; no blob circles
-// ─────────────────────────────────────────────────────────────
-function buildOrganicPalm(
-  skinMat: THREE.Material,
-  skinDarkMat: THREE.Material
-): THREE.Group {
-  const g = new THREE.Group();
-
-  // ── 1. Main palm slab – smooth rounded box (the fundamental shape) ──
-  const palmGeo = makeRoundedBox(0.200, 0.218, 0.056, 0.020, 7);
-  const palm = new THREE.Mesh(palmGeo, skinMat);
-  palm.position.set(0.004, 0.010, 0);
-  g.add(palm);
-
-  // ── 2. Thenar eminence – thumb-side muscle (one large ellipsoid) ──
-  const thenarGeo = new THREE.SphereGeometry(1, 22, 16);
-  thenarGeo.scale(0.052, 0.100, 0.038);
-  const thenar = new THREE.Mesh(thenarGeo, skinMat);
-  // Positioned so it overlaps the palm slab edge – no gap, no separate blob
-  thenar.position.set(-0.068, 0.022, 0.012);
-  g.add(thenar);
-
-  // ── 3. Hypothenar eminence – pinky-side roll (subtle) ──
-  const hypoGeo = new THREE.SphereGeometry(1, 18, 14);
-  hypoGeo.scale(0.036, 0.092, 0.030);
-  const hypo = new THREE.Mesh(hypoGeo, skinMat);
-  hypo.position.set(0.072, 0.004, 0.008);
-  g.add(hypo);
-
-  // ── 4. Wrist transition band ──
-  const wristGeo = new THREE.CapsuleGeometry(0.025, 0.060, 4, 16);
-  wristGeo.rotateZ(Math.PI / 2);
-  const wrist = new THREE.Mesh(wristGeo, skinDarkMat);
-  wrist.position.set(0, -0.120, 0);
-  g.add(wrist);
-
-  return g;
+// ─── Palm mesh ────────────────────────────────────────────────────────────────
+// Single RoundedBoxGeometry – one mesh, one draw call, perfectly smooth edges.
+function buildPalm(): THREE.Mesh {
+  // width × height × depth, subdivisions, cornerRadius
+  const geo = new RoundedBoxGeometry(0.202, 0.220, 0.068, 4, 0.026);
+  return new THREE.Mesh(geo, SHARED_SKIN);
 }
 
-// ─────────────────────────────────────────────────────────────
-// HandModel
-// ─────────────────────────────────────────────────────────────
+// ─── HandModel ────────────────────────────────────────────────────────────────
 export class HandModel {
-  public root:       THREE.Group;
+  public root: THREE.Group;
   private palmGroup: THREE.Group;
-  private joints:    Record<string, FingerJoints>;
-  private isLeft:    boolean;
-  private mats:      THREE.Material[];
+  private rigs: Record<string, FingerRig>;
+  private isLeft: boolean;
 
   constructor(isLeft = false) {
-    this.isLeft = isLeft;
-    this.root   = new THREE.Group();
-    this.mats   = [];
+    this.isLeft   = isLeft;
+    this.root     = new THREE.Group();
+    this.palmGroup = new THREE.Group();
+    this.rigs     = {};
 
-    const skinMat     = makeSkinMat(SKIN_MID);
-    const skinDarkMat = makeSkinMat(SKIN_DARK, 0.78);
-    const nailMat = new THREE.MeshPhysicalMaterial({
-      color: NAIL_COL, roughness: 0.28, metalness: 0.02,
-      clearcoat: 0.60, clearcoatRoughness: 0.32,
+    // Palm slab (single unified mesh)
+    const palm = buildPalm();
+    palm.position.set(0.004, 0.008, 0);
+    this.palmGroup.add(palm);
+
+    // Wrist taper
+    const wGeo = new THREE.CylinderGeometry(0.035, 0.040, 0.040, 14, 1);
+    wGeo.translate(0, -0.030, 0);
+    this.palmGroup.add(new THREE.Mesh(wGeo, SHARED_SKIN_DK));
+
+    // Build fingers
+    const names = ['thumb', 'index', 'middle', 'ring', 'pinky'];
+    names.forEach(name => {
+      const rig = buildFinger(name);
+      this.rigs[name] = rig;
+
+      const pos = MCP_POS[name].clone();
+      if (isLeft) pos.x = -pos.x;
+      rig.meta.position.copy(pos);
+
+      const splay = isLeft ? -REST_SPLAY[name] : REST_SPLAY[name];
+      rig.mcp.rotation.x = REST_FLEX[name];
+      rig.mcp.rotation.z = splay;
+
+      this.palmGroup.add(rig.meta);
     });
-    this.mats.push(skinMat, skinDarkMat, nailMat);
 
-    // Palm (built for right hand; mirrored for left via scale.x = -1)
-    this.palmGroup = buildOrganicPalm(skinMat, skinDarkMat);
     this.root.add(this.palmGroup);
-
-    // Fingers
-    this.joints = {};
-    ['thumb', 'index', 'middle', 'ring', 'pinky'].forEach(name => {
-      const f = buildFinger(name, skinMat, nailMat);
-      this.joints[name] = f;
-
-      let [ox, oy, oz] = MCP_POS[name];
-      if (isLeft) ox = -ox;
-
-      f.metacarpal.position.set(ox, oy, oz);
-      f.mcp.rotation.x = REST_FLEX[name];
-      f.mcp.rotation.z = isLeft ? -REST_SPLAY[name] : REST_SPLAY[name];
-      this.palmGroup.add(f.metacarpal);
-    });
-
     if (isLeft) this.root.scale.x = -1;
   }
 
-  applyPose(pose: HandPose): void  { this._setPose(pose, 1); }
-  lerpToPose(pose: HandPose, t: number): void { this._setPose(pose, t); }
+  applyPose(pose: HandPose)               { this._setPose(pose, 1); }
+  lerpToPose(pose: HandPose, t: number)   { this._setPose(pose, t); }
 
-  private _setPose(pose: HandPose, t: number): void {
+  private _setPose(pose: HandPose, t: number) {
     this._applyFinger('index',  pose.index.curl,  pose.index.spread,  t);
     this._applyFinger('middle', pose.middle.curl, pose.middle.spread, t);
     this._applyFinger('ring',   pose.ring.curl,   pose.ring.spread,   t);
@@ -261,229 +206,233 @@ export class HandModel {
     this.palmGroup.rotation.z = lr(this.palmGroup.rotation.z, pose.wristZ ?? 0);
   }
 
-  private _applyFinger(name: string, curl: number, spread: number, t: number): void {
-    const f        = this.joints[name];
-    const maxFlex  = Math.PI * 0.88;
-    const maxSplay = 0.28;
-    const sign     = this.isLeft ? 1 : -1;
-    const baseZ    = this.isLeft ? -REST_SPLAY[name] : REST_SPLAY[name];
+  private _applyFinger(name: string, curl: number, spread: number, t: number) {
+    const { mcp, pip, dip } = this.rigs[name];
+    const maxFlex = Math.PI * 0.90;
+    const sign    = this.isLeft ? 1 : -1;
+    const baseZ   = this.isLeft ? -REST_SPLAY[name] : REST_SPLAY[name];
 
     const lr = (c: number, d: number) => c + (d - c) * t;
-    f.mcp.rotation.x = lr(f.mcp.rotation.x, REST_FLEX[name] - curl * maxFlex * 0.38);
-    f.mcp.rotation.z = lr(f.mcp.rotation.z, baseZ + sign * spread * maxSplay);
-    f.pip.rotation.x = lr(f.pip.rotation.x, -curl * maxFlex * 0.40);
-    f.dip.rotation.x = lr(f.dip.rotation.x, -curl * maxFlex * 0.22);
+    mcp.rotation.x = lr(mcp.rotation.x, REST_FLEX[name] - curl * maxFlex * 0.36);
+    mcp.rotation.z = lr(mcp.rotation.z, baseZ + sign * spread * 0.28);
+    pip.rotation.x = lr(pip.rotation.x, -curl * maxFlex * 0.40);
+    dip.rotation.x = lr(dip.rotation.x, -curl * maxFlex * 0.24);
   }
 
-  private _applyThumb(flex: number, abd: number, t: number): void {
-    const f       = this.joints['thumb'];
-    const maxFlex = Math.PI * 0.52;
-    const maxAbd  = Math.PI * 0.48;
+  private _applyThumb(flex: number, abd: number, t: number) {
+    const { mcp, pip, dip } = this.rigs['thumb'];
+    const maxFlex = Math.PI * 0.54;
+    const maxAbd  = Math.PI * 0.46;
     const sign    = this.isLeft ? 1 : -1;
     const baseZ   = this.isLeft ? -REST_SPLAY['thumb'] : REST_SPLAY['thumb'];
 
     const lr = (c: number, d: number) => c + (d - c) * t;
-    f.mcp.rotation.x = lr(f.mcp.rotation.x, REST_FLEX['thumb'] - flex * maxFlex * 0.35);
-    f.mcp.rotation.z = lr(f.mcp.rotation.z, baseZ + sign * abd * maxAbd);
-    f.pip.rotation.x = lr(f.pip.rotation.x, -flex * maxFlex * 0.42);
-    f.dip.rotation.x = lr(f.dip.rotation.x, -flex * maxFlex * 0.23);
+    mcp.rotation.x = lr(mcp.rotation.x, REST_FLEX['thumb'] - flex * maxFlex * 0.35);
+    mcp.rotation.z = lr(mcp.rotation.z, baseZ + sign * abd  * maxAbd);
+    pip.rotation.x = lr(pip.rotation.x, -flex * maxFlex * 0.42);
+    dip.rotation.x = lr(dip.rotation.x, -flex * maxFlex * 0.23);
   }
 
-  dispose(): void {
-    this.mats.forEach(m => m.dispose());
-    this.root.traverse(o => { if (o instanceof THREE.Mesh) o.geometry.dispose(); });
+  dispose() {
+    this.root.traverse(o => {
+      if (o instanceof THREE.Mesh) o.geometry.dispose();
+    });
   }
 }
 
-// ─────────────────────────────────────────────────────────────
-// FaceModel
-// ─────────────────────────────────────────────────────────────
+// ─── FaceModel ────────────────────────────────────────────────────────────────
 export class FaceModel {
   public root: THREE.Group;
 
-  private leftBrow:   THREE.Group;
-  private rightBrow:  THREE.Group;
-  private upperLip:   THREE.Mesh;
-  private lowerLip:   THREE.Mesh;
-  private leftLid:    THREE.Mesh;
-  private rightLid:   THREE.Mesh;
-  private leftCheek:  THREE.Mesh;
-  private rightCheek: THREE.Mesh;
+  private leftBrow:  THREE.Group;
+  private rightBrow: THREE.Group;
+  private upperLip:  THREE.Mesh;
+  private lowerLip:  THREE.Mesh;
+  private leftLid:   THREE.Mesh;
+  private rightLid:  THREE.Mesh;
+  private leftCheek: THREE.Mesh;
+  private rightCheek:THREE.Mesh;
 
   constructor() {
     this.root = new THREE.Group();
 
-    const skinMat  = makeSkinMat(SKIN_MID);
-    const skinDark = makeSkinMat(SKIN_DARK, 0.80);
-    const whiteMat = new THREE.MeshPhysicalMaterial({ color: EYE_WHITE, roughness: 0.12, clearcoat: 0.35 });
-    const irisMat  = new THREE.MeshPhysicalMaterial({ color: IRIS_COL,  roughness: 0.08, clearcoat: 0.55 });
-    const pupilMat = new THREE.MeshStandardMaterial({ color: PUPIL_COL, roughness: 0.40 });
-    const browMat  = new THREE.MeshStandardMaterial({ color: HAIR_COL,  roughness: 0.70 });
-    const hairMat  = new THREE.MeshStandardMaterial({ color: HAIR_COL,  roughness: 0.78 });
-    const lipMat   = new THREE.MeshPhysicalMaterial({ color: LIP_COL,   roughness: 0.42, clearcoat: 0.25 });
-    const lashMat  = new THREE.MeshStandardMaterial({ color: 0x100808,  roughness: 0.90 });
+    const sk  = skinMat(SKIN,    0.68);
+    const skd = skinMat(SKIN_DK, 0.74);
+    const skl = skinMat(SKIN_LT, 0.62);
+    const wm  = new THREE.MeshStandardMaterial({ color: EYE_W,  roughness: 0.12 });
+    const im  = new THREE.MeshStandardMaterial({ color: IRIS,   roughness: 0.08 });
+    const pm  = new THREE.MeshStandardMaterial({ color: PUPIL,  roughness: 0.40 });
+    const bm  = new THREE.MeshStandardMaterial({ color: HAIR,   roughness: 0.72 });
+    const hm  = new THREE.MeshStandardMaterial({ color: HAIR,   roughness: 0.78 });
+    const lm  = new THREE.MeshStandardMaterial({ color: LIP,    roughness: 0.42 });
+    const lsm = new THREE.MeshStandardMaterial({ color: 0x0e0808, roughness: 0.88 });
 
-    // Head
-    const headGeo = new THREE.SphereGeometry(0.192, 32, 26);
+    // ── Head ──
+    const headGeo = new THREE.SphereGeometry(0.190, 32, 24);
     headGeo.scale(1.0, 1.24, 0.95);
-    this.root.add(new THREE.Mesh(headGeo, skinMat));
+    this.root.add(new THREE.Mesh(headGeo, sk));
 
-    // Cheekbones
-    const ckGeo = new THREE.SphereGeometry(0.075, 12, 9);
-    this.leftCheek  = new THREE.Mesh(ckGeo,       skinMat);
-    this.rightCheek = new THREE.Mesh(ckGeo.clone(), skinMat);
-    this.leftCheek.position.set( -0.120, -0.034, 0.130);
-    this.rightCheek.position.set(  0.120, -0.034, 0.130);
-    this.leftCheek.scale.setScalar(0.52);
-    this.rightCheek.scale.setScalar(0.52);
-    this.root.add(this.leftCheek, this.rightCheek);
-
-    // Ears
-    const earGeo = new THREE.CapsuleGeometry(0.024, 0.050, 4, 10);
-    const lEar = new THREE.Mesh(earGeo, skinDark);
-    lEar.position.set(-0.196, 0.010, 0.012); lEar.rotation.z = 0.22;
-    const rEar = new THREE.Mesh(earGeo.clone(), skinDark);
-    rEar.position.set( 0.196, 0.010, 0.012); rEar.rotation.z = -0.22;
-    const conchaGeo = new THREE.TorusGeometry(0.013, 0.006, 6, 12);
-    const lConcha = new THREE.Mesh(conchaGeo, skinDark);
-    lConcha.position.set(-0.196, 0.010, 0.018);
-    const rConcha = new THREE.Mesh(conchaGeo.clone(), skinDark);
-    rConcha.position.set( 0.196, 0.010, 0.018);
-    this.root.add(lEar, rEar, lConcha, rConcha);
-
-    // Jaw
-    const jawGeo = new THREE.SphereGeometry(0.112, 18, 14);
-    jawGeo.scale(1.0, 0.62, 0.90);
-    const jaw = new THREE.Mesh(jawGeo, skinMat);
-    jaw.position.set(0, -0.180, 0.038);
+    // ── Jaw ──
+    const jawGeo = new THREE.SphereGeometry(0.108, 20, 14);
+    jawGeo.scale(1.0, 0.60, 0.88);
+    const jaw = new THREE.Mesh(jawGeo, sk);
+    jaw.position.set(0, -0.178, 0.036);
     this.root.add(jaw);
 
-    // Nose
-    const noseRootGeo = new THREE.SphereGeometry(0.030, 12, 9);
-    noseRootGeo.scale(0.70, 1.25, 1.0);
-    const noseRoot = new THREE.Mesh(noseRootGeo, skinMat);
-    noseRoot.position.set(0, -0.012, 0.186);
-    this.root.add(noseRoot);
-
-    const noseTipGeo = new THREE.SphereGeometry(0.024, 12, 9);
-    noseTipGeo.scale(1.15, 0.78, 1.05);
-    const noseTip = new THREE.Mesh(noseTipGeo, skinMat);
-    noseTip.position.set(0, -0.044, 0.197);
-    this.root.add(noseTip);
-
-    [-0.018, 0.018].forEach(x => {
-      const nGeo = new THREE.SphereGeometry(0.012, 10, 7);
-      nGeo.scale(1, 0.65, 1);
-      this.root.add(new THREE.Mesh(nGeo, skinDark) );
-      const n = this.root.children[this.root.children.length - 1] as THREE.Mesh;
-      n.position.set(x, -0.052, 0.188);
+    // ── Ears ──
+    [[-0.194, 1], [0.194, -1]].forEach(([ex]) => {
+      const eg = new THREE.CapsuleGeometry(0.024, 0.050, 4, 10);
+      const e  = new THREE.Mesh(eg, skd);
+      e.position.set(ex as number, 0.010, 0.010);
+      e.rotation.z = (ex as number) < 0 ? 0.22 : -0.22;
+      this.root.add(e);
     });
 
-    // Eyes
-    [[-0.068, 1], [0.068, -1]].forEach(([x]) => {
+    // ── Cheeks ──
+    const ckGeo = new THREE.SphereGeometry(0.072, 12, 9);
+    this.leftCheek  = new THREE.Mesh(ckGeo,       skl);
+    this.rightCheek = new THREE.Mesh(ckGeo.clone(), skl);
+    this.leftCheek.position.set( -0.118, -0.032, 0.128);
+    this.rightCheek.position.set(  0.118, -0.032, 0.128);
+    this.leftCheek.scale.setScalar(0.50);
+    this.rightCheek.scale.setScalar(0.50);
+    this.root.add(this.leftCheek, this.rightCheek);
+
+    // ── Nose ──
+    const nrg = new THREE.SphereGeometry(0.028, 12, 9);
+    nrg.scale(0.72, 1.22, 1.0);
+    const nr = new THREE.Mesh(nrg, sk);
+    nr.position.set(0, -0.010, 0.185);
+    this.root.add(nr);
+
+    const ntg = new THREE.SphereGeometry(0.022, 12, 9);
+    ntg.scale(1.14, 0.76, 1.04);
+    const nt = new THREE.Mesh(ntg, sk);
+    nt.position.set(0, -0.042, 0.196);
+    this.root.add(nt);
+
+    [-0.016, 0.016].forEach(nx => {
+      const ng = new THREE.SphereGeometry(0.010, 10, 7);
+      ng.scale(1, 0.64, 1);
+      const n = new THREE.Mesh(ng, skd);
+      n.position.set(nx, -0.050, 0.187);
+      this.root.add(n);
+    });
+
+    // ── Eyes ──
+    [[-0.066, true], [0.066, false]].forEach(([ex]) => {
       const eg = new THREE.Group();
-      eg.position.set(x as number, 0.033, 0.166);
-      eg.add(new THREE.Mesh(new THREE.SphereGeometry(0.034,  16, 13), whiteMat));
-      const iris = new THREE.Mesh(new THREE.SphereGeometry(0.022, 14, 11), irisMat);
-      iris.position.z = 0.017; eg.add(iris);
-      const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.0135, 12, 9), pupilMat);
-      pupil.position.z = 0.025; eg.add(pupil);
-      const hi = new THREE.Mesh(new THREE.SphereGeometry(0.004, 7, 6),
+      eg.position.set(ex as number, 0.032, 0.166);
+      eg.add(new THREE.Mesh(new THREE.SphereGeometry(0.033, 16, 12), wm));
+      const iris = new THREE.Mesh(new THREE.SphereGeometry(0.020, 14, 10), im);
+      iris.position.z = 0.017;
+      eg.add(iris);
+      const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.013, 10, 8), pm);
+      pupil.position.z = 0.026;
+      eg.add(pupil);
+      const hi = new THREE.Mesh(new THREE.SphereGeometry(0.004, 6, 5),
         new THREE.MeshBasicMaterial({ color: 0xffffff }));
-      hi.position.set(0.009, 0.009, 0.033); eg.add(hi);
+      hi.position.set(0.009, 0.009, 0.032);
+      eg.add(hi);
       this.root.add(eg);
     });
 
-    // Eyelids
-    const makeLid = (x: number): THREE.Mesh => {
-      const lg = new THREE.SphereGeometry(0.037, 14, 8, 0, Math.PI * 2, 0, Math.PI * 0.54);
-      const l = new THREE.Mesh(lg, skinMat);
-      l.position.set(x, 0.033, 0.169);
-      l.rotation.x = -0.08;
+    // ── Eyelids ──
+    const makeLid = (ex: number): THREE.Mesh => {
+      const lg = new THREE.SphereGeometry(0.036, 14, 8, 0, Math.PI * 2, 0, Math.PI * 0.52);
+      const l = new THREE.Mesh(lg, sk);
+      l.position.set(ex, 0.032, 0.168);
       l.scale.y = 0.18;
       return l;
     };
-    this.leftLid  = makeLid(-0.068);
-    this.rightLid = makeLid( 0.068);
+    this.leftLid  = makeLid(-0.066);
+    this.rightLid = makeLid( 0.066);
     this.root.add(this.leftLid, this.rightLid);
 
-    [-0.068, 0.068].forEach(x => {
-      const l = new THREE.Mesh(new THREE.BoxGeometry(0.050, 0.003, 0.002), lashMat);
-      l.position.set(x, 0.051, 0.171); l.rotation.x = -0.10;
+    // Lashes
+    [-0.066, 0.066].forEach(ex => {
+      const l = new THREE.Mesh(new THREE.BoxGeometry(0.048, 0.003, 0.002), lsm);
+      l.position.set(ex, 0.050, 0.170);
+      l.rotation.x = -0.10;
       this.root.add(l);
     });
 
-    // Eyebrows
-    const makeBrow = (x: number): THREE.Group => {
+    // ── Eyebrows ──
+    const makeBrow = (ex: number): THREE.Group => {
       const g = new THREE.Group();
-      g.position.set(x, 0.092, 0.158);
-      const s1g = new THREE.CapsuleGeometry(0.0055, 0.032, 3, 10);
-      s1g.rotateZ(Math.PI / 2 + 0.16);
-      const s1 = new THREE.Mesh(s1g, browMat);
-      s1.position.set(-0.014, 0, 0);
-      const s2g = new THREE.CapsuleGeometry(0.0045, 0.024, 3, 10);
-      s2g.rotateZ(Math.PI / 2 - 0.20);
-      const s2 = new THREE.Mesh(s2g, browMat);
-      s2.position.set(0.018, 0.004, 0);
-      g.add(s1, s2);
+      g.position.set(ex, 0.090, 0.157);
+      const s1g = new THREE.CapsuleGeometry(0.005, 0.030, 3, 10);
+      s1g.rotateZ(Math.PI / 2 + 0.18);
+      const s2g = new THREE.CapsuleGeometry(0.004, 0.022, 3, 10);
+      s2g.rotateZ(Math.PI / 2 - 0.22);
+      g.add(new THREE.Mesh(s1g, bm) );
+      const s2m = new THREE.Mesh(s2g, bm);
+      s2m.position.x = ex < 0 ? 0.032 : -0.032;
+      s2m.position.y = 0.004;
+      g.add(s2m);
       return g;
     };
-    this.leftBrow  = makeBrow(-0.068);
-    this.rightBrow = makeBrow( 0.068);
+    this.leftBrow  = makeBrow(-0.066);
+    this.rightBrow = makeBrow( 0.066);
     this.root.add(this.leftBrow, this.rightBrow);
 
-    // Lips
-    const ulg = new THREE.CapsuleGeometry(0.0108, 0.052, 4, 12);
-    ulg.rotateZ(Math.PI / 2); ulg.scale(1, 0.68, 1.12);
-    this.upperLip = new THREE.Mesh(ulg, lipMat);
-    this.upperLip.position.set(0, -0.075, 0.174);
+    // ── Lips ──
+    const ulg = new THREE.CapsuleGeometry(0.0105, 0.050, 4, 12);
+    ulg.rotateZ(Math.PI / 2);
+    ulg.scale(1, 0.66, 1.10);
+    this.upperLip = new THREE.Mesh(ulg, lm);
+    this.upperLip.position.set(0, -0.074, 0.173);
     this.root.add(this.upperLip);
 
-    const llg = new THREE.CapsuleGeometry(0.0118, 0.054, 4, 12);
-    llg.rotateZ(Math.PI / 2); llg.scale(1, 0.88, 1.12);
-    this.lowerLip = new THREE.Mesh(llg, lipMat);
-    this.lowerLip.position.set(0, -0.092, 0.173);
+    const llg = new THREE.CapsuleGeometry(0.0115, 0.052, 4, 12);
+    llg.rotateZ(Math.PI / 2);
+    llg.scale(1, 0.86, 1.10);
+    this.lowerLip = new THREE.Mesh(llg, lm);
+    this.lowerLip.position.set(0, -0.092, 0.172);
     this.root.add(this.lowerLip);
 
-    [-0.032, 0.032].forEach(x => {
-      const c = new THREE.Mesh(new THREE.SphereGeometry(0.008, 8, 6), lipMat);
-      c.position.set(x, -0.083, 0.172);
+    [-0.030, 0.030].forEach(cx => {
+      const c = new THREE.Mesh(new THREE.SphereGeometry(0.007, 8, 6), lm);
+      c.position.set(cx, -0.082, 0.171);
       this.root.add(c);
     });
 
-    const phil = new THREE.Mesh(new THREE.SphereGeometry(0.011, 8, 6), skinDark);
-    phil.geometry.scale(0.58, 1.25, 0.58);
-    phil.position.set(0, -0.062, 0.182);
+    const phil = new THREE.Mesh(new THREE.SphereGeometry(0.010, 8, 6), skd);
+    phil.geometry.scale(0.56, 1.22, 0.56);
+    phil.position.set(0, -0.060, 0.181);
     this.root.add(phil);
 
-    // Hair
-    const hcg = new THREE.SphereGeometry(0.198, 24, 18, 0, Math.PI * 2, 0, Math.PI * 0.56);
+    // ── Hair cap ──
+    const hcg = new THREE.SphereGeometry(0.196, 24, 18, 0, Math.PI * 2, 0, Math.PI * 0.56);
     hcg.scale(1.0, 1.24, 0.96);
-    const hairCap = new THREE.Mesh(hcg, hairMat);
-    hairCap.position.y = 0.018;
-    this.root.add(hairCap);
+    const hc = new THREE.Mesh(hcg, hm);
+    hc.position.y = 0.018;
+    this.root.add(hc);
 
-    [-0.168, 0.168].forEach(x => {
-      const sg = new THREE.CapsuleGeometry(0.056, 0.082, 3, 12);
-      const s = new THREE.Mesh(sg, hairMat);
-      s.position.set(x, 0.048, -0.020);
-      s.rotation.z = x < 0 ? 0.33 : -0.33;
+    [-0.166, 0.166].forEach(sx => {
+      const sg = new THREE.CapsuleGeometry(0.054, 0.080, 3, 12);
+      const s = new THREE.Mesh(sg, hm);
+      s.position.set(sx, 0.046, -0.018);
+      s.rotation.z = sx < 0 ? 0.32 : -0.32;
       this.root.add(s);
     });
 
-    // Neck
-    const neck = new THREE.Mesh(new THREE.CapsuleGeometry(0.044, 0.062, 4, 14), makeSkinMat(SKIN_MID, 0.80));
-    neck.position.y = -0.242;
+    // ── Neck ──
+    const neck = new THREE.Mesh(
+      new THREE.CapsuleGeometry(0.042, 0.058, 4, 14),
+      skinMat(SKIN, 0.72)
+    );
+    neck.position.y = -0.240;
     this.root.add(neck);
   }
 
-  applyExpression(expr: FaceExpression): void  { this._doExpr(expr, 1); }
-  lerpExpression(expr: FaceExpression, t: number): void { this._doExpr(expr, t); }
+  applyExpression(e: FaceExpression)            { this._doExpr(e, 1); }
+  lerpExpression(e: FaceExpression, t: number)  { this._doExpr(e, t); }
 
-  private _doExpr(e: FaceExpression, t: number): void {
+  private _doExpr(e: FaceExpression, t: number) {
     const lr = (c: number, d: number) => c + (d - c) * t;
 
-    const browY = 0.092 + e.eyebrowRaise * 0.028;
+    const browY = 0.090 + e.eyebrowRaise * 0.028;
     this.leftBrow.position.y  = lr(this.leftBrow.position.y,  browY);
     this.rightBrow.position.y = lr(this.rightBrow.position.y, browY);
     this.leftBrow.rotation.z  = lr(this.leftBrow.rotation.z,  -e.eyebrowRaise * 0.12);
@@ -494,13 +443,13 @@ export class FaceModel {
     this.rightLid.scale.y = lr(this.rightLid.scale.y, 0.18 + sqt * 0.72);
 
     const openOff = e.mouthOpen * 0.014;
-    this.upperLip.position.y = lr(this.upperLip.position.y, -0.075 + openOff * 0.4);
+    this.upperLip.position.y = lr(this.upperLip.position.y, -0.074 + openOff * 0.4);
     this.lowerLip.position.y = lr(this.lowerLip.position.y, -0.092 - openOff);
-    const smileSX = 1 + e.mouthSmile * 0.42;
-    this.upperLip.scale.x = lr(this.upperLip.scale.x, smileSX);
-    this.lowerLip.scale.x = lr(this.lowerLip.scale.x, smileSX);
+    const smX = 1 + e.mouthSmile * 0.40;
+    this.upperLip.scale.x = lr(this.upperLip.scale.x, smX);
+    this.lowerLip.scale.x = lr(this.lowerLip.scale.x, smX);
 
-    const cks = 0.52 + (e.cheekPuff ?? 0) * 0.55;
+    const cks = 0.50 + (e.cheekPuff ?? 0) * 0.55;
     this.leftCheek.scale.setScalar(lr(this.leftCheek.scale.x, cks));
     this.rightCheek.scale.setScalar(lr(this.rightCheek.scale.x, cks));
 
@@ -508,7 +457,7 @@ export class FaceModel {
     this.root.rotation.y = lr(this.root.rotation.y, e.headTiltY ?? 0);
   }
 
-  dispose(): void {
+  dispose() {
     this.root.traverse(obj => {
       if (obj instanceof THREE.Mesh) {
         obj.geometry.dispose();
