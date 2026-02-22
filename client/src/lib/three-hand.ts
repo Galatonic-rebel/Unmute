@@ -14,13 +14,21 @@ const IRIS    = new THREE.Color(0x3a6090);
 const PUPIL   = new THREE.Color(0x0d0608);
 
 // ─── Materials ────────────────────────────────────────────────────────────────
+// DEBUG_SIDES: set true to color left hand red, right hand blue for verification
+const DEBUG_SIDES = false;
+
 function skinMat(col = SKIN, rough = 0.68) {
-  return new THREE.MeshStandardMaterial({ color: col, roughness: rough, metalness: 0 });
+  return new THREE.MeshStandardMaterial({
+    color: col, roughness: rough, metalness: 0,
+    // DoubleSide is required: scale.x=-1 (left hand mirror) reverses winding order,
+    // which would cull the outer surface with FrontSide. DoubleSide renders both.
+    side: THREE.DoubleSide,
+  });
 }
 
 const SHARED_SKIN    = skinMat(SKIN,    0.68);
 const SHARED_SKIN_DK = skinMat(SKIN_DK, 0.72);
-const SHARED_NAIL    = skinMat(NAIL,    0.30);
+const SHARED_NAIL    = new THREE.MeshStandardMaterial({ color: NAIL, roughness: 0.30, metalness: 0, side: THREE.DoubleSide });
 
 // ─── Geometry helpers ─────────────────────────────────────────────────────────
 
@@ -170,23 +178,38 @@ export class HandModel {
     this.palmGroup.add(new THREE.Mesh(wGeo, SHARED_SKIN_DK));
 
     // Build fingers
+    // Bug fix: only scale.x=-1 on the ROOT handles mirroring. Do NOT also negate
+    // pos.x or splay – that would double-negate and put the thumb on the wrong side.
     const names = ['thumb', 'index', 'middle', 'ring', 'pinky'];
     names.forEach(name => {
       const rig = buildFinger(name);
       this.rigs[name] = rig;
 
-      const pos = MCP_POS[name].clone();
-      if (isLeft) pos.x = -pos.x;
-      rig.meta.position.copy(pos);
+      // MCP positions are authored for the right hand.
+      // scale.x=-1 on root (below) mirrors everything, so use them as-is.
+      rig.meta.position.copy(MCP_POS[name]);
 
-      const splay = isLeft ? -REST_SPLAY[name] : REST_SPLAY[name];
+      // Splay rotations are also left alone — scale.x=-1 on root mirrors the Z rotation
+      // automatically, so no manual negation needed here either.
       rig.mcp.rotation.x = REST_FLEX[name];
-      rig.mcp.rotation.z = splay;
+      rig.mcp.rotation.z = REST_SPLAY[name];
+
+      // Debug: tint left hand red, right hand blue so you can verify sides instantly
+      if (DEBUG_SIDES) {
+        const debugCol = isLeft ? 0xff2222 : 0x2255ff;
+        rig.meta.traverse(o => {
+          if (o instanceof THREE.Mesh) {
+            o.material = new THREE.MeshStandardMaterial({ color: debugCol, roughness: 0.6, side: THREE.DoubleSide });
+          }
+        });
+      }
 
       this.palmGroup.add(rig.meta);
     });
 
     this.root.add(this.palmGroup);
+    // Mirror the entire hand group across X — this is the ONLY place mirroring is done.
+    // DoubleSide on all materials compensates for the winding-order reversal.
     if (isLeft) this.root.scale.x = -1;
   }
 
@@ -209,12 +232,13 @@ export class HandModel {
   private _applyFinger(name: string, curl: number, spread: number, t: number) {
     const { mcp, pip, dip } = this.rigs[name];
     const maxFlex = Math.PI * 0.90;
-    const sign    = this.isLeft ? 1 : -1;
-    const baseZ   = this.isLeft ? -REST_SPLAY[name] : REST_SPLAY[name];
+    // scale.x=-1 on root already mirrors Z rotations for the left hand,
+    // so use the same sign and baseZ for both hands — no manual negation.
+    const baseZ = REST_SPLAY[name];
 
     const lr = (c: number, d: number) => c + (d - c) * t;
     mcp.rotation.x = lr(mcp.rotation.x, REST_FLEX[name] - curl * maxFlex * 0.36);
-    mcp.rotation.z = lr(mcp.rotation.z, baseZ + sign * spread * 0.28);
+    mcp.rotation.z = lr(mcp.rotation.z, baseZ + (-1) * spread * 0.28);
     pip.rotation.x = lr(pip.rotation.x, -curl * maxFlex * 0.40);
     dip.rotation.x = lr(dip.rotation.x, -curl * maxFlex * 0.24);
   }
@@ -223,12 +247,12 @@ export class HandModel {
     const { mcp, pip, dip } = this.rigs['thumb'];
     const maxFlex = Math.PI * 0.54;
     const maxAbd  = Math.PI * 0.46;
-    const sign    = this.isLeft ? 1 : -1;
-    const baseZ   = this.isLeft ? -REST_SPLAY['thumb'] : REST_SPLAY['thumb'];
+    // Same reasoning: scale.x=-1 on root mirrors Z, so no hand-specific sign needed.
+    const baseZ = REST_SPLAY['thumb'];
 
     const lr = (c: number, d: number) => c + (d - c) * t;
     mcp.rotation.x = lr(mcp.rotation.x, REST_FLEX['thumb'] - flex * maxFlex * 0.35);
-    mcp.rotation.z = lr(mcp.rotation.z, baseZ + sign * abd  * maxAbd);
+    mcp.rotation.z = lr(mcp.rotation.z, baseZ + (-1) * abd * maxAbd);
     pip.rotation.x = lr(pip.rotation.x, -flex * maxFlex * 0.42);
     dip.rotation.x = lr(dip.rotation.x, -flex * maxFlex * 0.23);
   }
