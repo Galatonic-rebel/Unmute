@@ -99,9 +99,9 @@ export function SignAvatar({ currentWord, isRecording, signQueue }: SignAvatarPr
       scene.add(new THREE.Mesh(bgSphereGeo, bgMat));
 
       // ── Camera ─────────────────────────────────────────────────────────
-      const camera = new THREE.PerspectiveCamera(38, w / h, 0.01, 20);
-      camera.position.set(0, 0.22, 1.18);
-      camera.lookAt(0, 0.10, 0);
+      const camera = new THREE.PerspectiveCamera(36, w / h, 0.01, 20);
+      camera.position.set(0, 0.18, 1.22);
+      camera.lookAt(0, 0.06, 0);
 
       // ── Lighting ───────────────────────────────────────────────────────
       // Warm hemisphere (sky + ground)
