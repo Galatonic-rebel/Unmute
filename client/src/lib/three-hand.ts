@@ -54,29 +54,29 @@ function makeSegmentGeo(rBase: number, rTip: number, length: number) {
 // ─── Finger anatomy constants ─────────────────────────────────────────────────
 // Each finger: [proxLength, midLength, distLength]  (metres)
 const F_LEN: Record<string, [number, number, number]> = {
-  thumb:  [0.040, 0.030, 0.024],
-  index:  [0.048, 0.034, 0.022],
-  middle: [0.054, 0.038, 0.024],
-  ring:   [0.050, 0.036, 0.022],
-  pinky:  [0.036, 0.024, 0.016],
+  thumb:  [0.054, 0.042, 0.032],
+  index:  [0.068, 0.050, 0.032],
+  middle: [0.076, 0.056, 0.034],
+  ring:   [0.070, 0.052, 0.032],
+  pinky:  [0.050, 0.034, 0.022],
 };
 
 // Each finger: [proxRadius, midRadius, distRadius]
 const F_RAD: Record<string, [number, number, number]> = {
-  thumb:  [0.0155, 0.0135, 0.0115],
-  index:  [0.0135, 0.0118, 0.0100],
-  middle: [0.0142, 0.0124, 0.0105],
-  ring:   [0.0132, 0.0115, 0.0098],
-  pinky:  [0.0108, 0.0094, 0.0080],
+  thumb:  [0.0145, 0.0126, 0.0108],
+  index:  [0.0126, 0.0110, 0.0094],
+  middle: [0.0132, 0.0116, 0.0098],
+  ring:   [0.0122, 0.0107, 0.0092],
+  pinky:  [0.0100, 0.0088, 0.0075],
 };
 
 // MCP position on palm (right-hand; flipped for left)
 const MCP_POS: Record<string, THREE.Vector3> = {
-  thumb:  new THREE.Vector3(-0.082,  0.028, 0.006),
-  index:  new THREE.Vector3(-0.048,  0.092, 0.004),
-  middle: new THREE.Vector3(-0.006,  0.102, 0.004),
-  ring:   new THREE.Vector3( 0.036,  0.093, 0.004),
-  pinky:  new THREE.Vector3( 0.073,  0.078, 0.004),
+  thumb:  new THREE.Vector3(-0.068,  0.022, 0.006),
+  index:  new THREE.Vector3(-0.040,  0.077, 0.004),
+  middle: new THREE.Vector3(-0.005,  0.085, 0.004),
+  ring:   new THREE.Vector3( 0.030,  0.077, 0.004),
+  pinky:  new THREE.Vector3( 0.060,  0.064, 0.004),
 };
 
 const REST_FLEX: Record<string, number> = {
@@ -142,7 +142,7 @@ function buildFinger(name: string): FingerRig {
 // Single RoundedBoxGeometry – one mesh, one draw call, perfectly smooth edges.
 function buildPalm(): THREE.Mesh {
   // width × height × depth, subdivisions, cornerRadius
-  const geo = new RoundedBoxGeometry(0.202, 0.220, 0.068, 4, 0.026);
+  const geo = new RoundedBoxGeometry(0.158, 0.168, 0.058, 4, 0.020);
   return new THREE.Mesh(geo, SHARED_SKIN);
 }
 
@@ -161,7 +161,7 @@ export class HandModel {
 
     // Palm slab (single unified mesh)
     const palm = buildPalm();
-    palm.position.set(0.004, 0.008, 0);
+    palm.position.set(0.003, -0.002, 0);
     this.palmGroup.add(palm);
 
     // Wrist taper
