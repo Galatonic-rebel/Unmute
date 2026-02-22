@@ -12,7 +12,7 @@ interface SignAvatarProps {
 interface QueueItem {
   right: HandPose;
   left:  HandPose;
-  face:  FaceExpression;
+  face?: FaceExpression;
   holdMs: number;
 }
 
@@ -267,7 +267,7 @@ export function SignAvatar({ currentWord, isRecording, signQueue }: SignAvatarPr
           const lerpT = Math.min(dt / 65, 1);
           rHand.lerpToPose(cur.right, lerpT);
           lHand.lerpToPose(cur.left,  lerpT);
-          fc.lerpExpression(cur.face, lerpT);
+          fc.lerpExpression(cur.face ?? NEUTRAL_FACE, lerpT);
           if (now - itemStartRef.current >= cur.holdMs) {
             currentItemRef.current = null;
           }
