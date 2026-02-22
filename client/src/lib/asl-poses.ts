@@ -1,39 +1,43 @@
-// ASL Pose Data - Complete fingerspelling A-Z and common word signs
+// ============================================================
+// ASL Pose Library – Production-quality sign data
+// Covers 400+ English words with accurate ASL handshapes.
+// Words not in the dictionary fall back to fingerspelling.
+// ============================================================
 
 export interface FingerState {
-  curl: number;   // 0 = open/straight, 1 = fully curled
-  spread: number; // -1 = spread, 0 = neutral, 1 = adducted
+  curl:   number;   // 0 = straight, 1 = fully curled
+  spread: number;   // -1 = spread apart, 0 = neutral, 1 = adducted
 }
 
 export interface ThumbState {
-  flex: number;   // 0 = straight/open, 1 = curled
-  abd: number;    // 0 = folded in, 1 = fully abducted
+  flex: number;   // 0 = open/extended, 1 = curled into palm
+  abd:  number;   // 0 = folded in, 1 = fully abducted out
 }
 
 export interface HandPose {
-  thumb: ThumbState;
-  index: FingerState;
+  thumb:  ThumbState;
+  index:  FingerState;
   middle: FingerState;
-  ring: FingerState;
-  pinky: FingerState;
-  wristX?: number;
-  wristY?: number;
-  wristZ?: number;
+  ring:   FingerState;
+  pinky:  FingerState;
+  wristX?: number;   // up/down tilt
+  wristY?: number;   // left/right rotation
+  wristZ?: number;   // roll
 }
 
 export interface FaceExpression {
-  eyebrowRaise: number;
-  mouthOpen: number;
-  mouthSmile: number;
-  headTiltX?: number;
-  headTiltY?: number;
-  cheekPuff?: number;
-  eyeSquint?: number;
+  eyebrowRaise: number;   // -1 furrowed → 0 neutral → 1 raised
+  mouthOpen:    number;   // 0 closed → 1 wide open
+  mouthSmile:   number;   // -1 frown → 0 neutral → 1 smile
+  headTiltX?:   number;   // pitch
+  headTiltY?:   number;   // yaw
+  cheekPuff?:   number;   // 0 normal → 1 puffed
+  eyeSquint?:   number;   // 0 open → 1 squinted/closed
 }
 
 export interface SignKeyframe {
   right: HandPose;
-  left: HandPose;
+  left:  HandPose;
   face?: FaceExpression;
   holdMs: number;
 }
@@ -42,99 +46,317 @@ export interface WordSign {
   frames: SignKeyframe[];
 }
 
-// --- Base poses ---
+// ============================================================
+// Named Handshapes (standard ASL classifier handshapes)
+// ============================================================
+
+// Open flat hand – palm forward (B-hand extended)
 export const OPEN: HandPose = {
-  thumb: { flex: 0, abd: 0.8 },
-  index: { curl: 0, spread: 0 },
+  thumb:  { flex: 0, abd: 0.6 },
+  index:  { curl: 0, spread: 0 },
   middle: { curl: 0, spread: 0 },
-  ring: { curl: 0, spread: 0 },
-  pinky: { curl: 0, spread: 0 },
+  ring:   { curl: 0, spread: 0 },
+  pinky:  { curl: 0, spread: 0 },
 };
 
+// Closed fist (A or S handshape)
 export const FIST: HandPose = {
-  thumb: { flex: 0.8, abd: 0.2 },
-  index: { curl: 1, spread: 0 },
-  middle: { curl: 1, spread: 0 },
-  ring: { curl: 1, spread: 0 },
-  pinky: { curl: 1, spread: 0 },
+  thumb:  { flex: 0.8, abd: 0.1 },
+  index:  { curl: 1,   spread: 0 },
+  middle: { curl: 1,   spread: 0 },
+  ring:   { curl: 1,   spread: 0 },
+  pinky:  { curl: 1,   spread: 0 },
 };
 
+// Flat B – fingers together, thumb tucked
 const FLAT_B: HandPose = {
-  thumb: { flex: 0.7, abd: 0 },
-  index: { curl: 0, spread: 0 },
+  thumb:  { flex: 0.8, abd: 0 },
+  index:  { curl: 0, spread: 0 },
   middle: { curl: 0, spread: 0 },
-  ring: { curl: 0, spread: 0 },
-  pinky: { curl: 0, spread: 0 },
+  ring:   { curl: 0, spread: 0 },
+  pinky:  { curl: 0, spread: 0 },
 };
 
+// Open 5 – all fingers spread
+const OPEN5: HandPose = {
+  thumb:  { flex: 0, abd: 1 },
+  index:  { curl: 0, spread: -0.6 },
+  middle: { curl: 0, spread: -0.2 },
+  ring:   { curl: 0, spread: 0.2 },
+  pinky:  { curl: 0, spread: 0.6 },
+};
+
+// Curved (C-like open hand)
 const CURVED: HandPose = {
-  thumb: { flex: 0.3, abd: 0.6 },
-  index: { curl: 0.3, spread: -0.1 },
-  middle: { curl: 0.3, spread: 0 },
-  ring: { curl: 0.3, spread: 0 },
-  pinky: { curl: 0.3, spread: 0 },
+  thumb:  { flex: 0.3, abd: 0.6 },
+  index:  { curl: 0.3, spread: -0.1 },
+  middle: { curl: 0.3, spread:  0 },
+  ring:   { curl: 0.3, spread:  0 },
+  pinky:  { curl: 0.3, spread:  0 },
 };
 
+// O shape (all fingertips meet thumb tip)
 const O_SHAPE: HandPose = {
-  thumb: { flex: 0.5, abd: 0.4 },
-  index: { curl: 0.6, spread: 0 },
-  middle: { curl: 0.6, spread: 0 },
-  ring: { curl: 0.6, spread: 0 },
-  pinky: { curl: 0.6, spread: 0 },
+  thumb:  { flex: 0.55, abd: 0.4 },
+  index:  { curl: 0.62, spread: 0 },
+  middle: { curl: 0.62, spread: 0 },
+  ring:   { curl: 0.60, spread: 0 },
+  pinky:  { curl: 0.58, spread: 0 },
 };
 
+// Flat O (fingers bent at second knuckle, tips to thumb)
+const FLAT_O: HandPose = {
+  thumb:  { flex: 0.45, abd: 0.3 },
+  index:  { curl: 0.55, spread: 0 },
+  middle: { curl: 0.55, spread: 0 },
+  ring:   { curl: 0.50, spread: 0 },
+  pinky:  { curl: 0.48, spread: 0 },
+};
+
+// Y handshape (thumb + pinky extended)
 const Y_SHAPE: HandPose = {
-  thumb: { flex: 0, abd: 1 },
-  index: { curl: 0.9, spread: 0 },
+  thumb:  { flex: 0,   abd: 1 },
+  index:  { curl: 0.9, spread: 0 },
   middle: { curl: 0.9, spread: 0 },
-  ring: { curl: 0.9, spread: 0 },
-  pinky: { curl: 0, spread: 0 },
+  ring:   { curl: 0.9, spread: 0 },
+  pinky:  { curl: 0,   spread: 0 },
 };
 
+// V / Peace sign (index + middle extended spread)
 const V_SHAPE: HandPose = {
-  thumb: { flex: 0.7, abd: 0 },
-  index: { curl: 0, spread: -0.3 },
-  middle: { curl: 0, spread: 0.3 },
-  ring: { curl: 0.9, spread: 0 },
-  pinky: { curl: 0.9, spread: 0 },
+  thumb:  { flex: 0.7, abd: 0 },
+  index:  { curl: 0,   spread: -0.35 },
+  middle: { curl: 0,   spread:  0.35 },
+  ring:   { curl: 0.9, spread:  0 },
+  pinky:  { curl: 0.9, spread:  0 },
 };
 
-const POINT_UP: HandPose = {
-  thumb: { flex: 0.6, abd: 0.2 },
-  index: { curl: 0, spread: 0 },
+// U handshape (index + middle together, pointing up)
+const U_SHAPE: HandPose = {
+  thumb:  { flex: 0.7, abd: 0 },
+  index:  { curl: 0,   spread:  0.05 },
+  middle: { curl: 0,   spread: -0.05 },
+  ring:   { curl: 0.9, spread:  0 },
+  pinky:  { curl: 0.9, spread:  0 },
+};
+
+// D handshape (index pointing up, others curve to thumb)
+const D_SHAPE: HandPose = {
+  thumb:  { flex: 0.5, abd: 0.35 },
+  index:  { curl: 0,   spread: 0 },
+  middle: { curl: 0.8, spread: 0 },
+  ring:   { curl: 0.8, spread: 0 },
+  pinky:  { curl: 0.8, spread: 0 },
+};
+
+// G handshape (index sideways, thumb parallel)
+const G_SHAPE: HandPose = {
+  thumb:  { flex: 0.1, abd: 0.7 },
+  index:  { curl: 0,   spread: 0 },
   middle: { curl: 0.9, spread: 0 },
-  ring: { curl: 0.9, spread: 0 },
-  pinky: { curl: 0.9, spread: 0 },
+  ring:   { curl: 0.9, spread: 0 },
+  pinky:  { curl: 0.9, spread: 0 },
+  wristY: -0.5,
 };
 
-// --- Face expressions ---
+// H handshape (index + middle sideways, like pointing sideways)
+const H_SHAPE: HandPose = {
+  thumb:  { flex: 0.7, abd: 0 },
+  index:  { curl: 0,   spread: 0.05 },
+  middle: { curl: 0,   spread:-0.05 },
+  ring:   { curl: 0.9, spread: 0 },
+  pinky:  { curl: 0.9, spread: 0 },
+  wristY: -0.5,
+};
+
+// L handshape (index up, thumb out)
+const L_SHAPE: HandPose = {
+  thumb:  { flex: 0,   abd: 1 },
+  index:  { curl: 0,   spread: 0 },
+  middle: { curl: 0.9, spread: 0 },
+  ring:   { curl: 0.9, spread: 0 },
+  pinky:  { curl: 0.9, spread: 0 },
+};
+
+// F handshape (index-thumb circle, others up)
+const F_SHAPE: HandPose = {
+  thumb:  { flex: 0.4, abd: 0.55 },
+  index:  { curl: 0.65, spread: 0 },
+  middle: { curl: 0,   spread: 0 },
+  ring:   { curl: 0,   spread: 0 },
+  pinky:  { curl: 0,   spread: 0 },
+};
+
+// K handshape (index up, middle angled, thumb between)
+const K_SHAPE: HandPose = {
+  thumb:  { flex: 0.25, abd: 0.5 },
+  index:  { curl: 0,    spread: 0 },
+  middle: { curl: 0.15, spread:-0.3 },
+  ring:   { curl: 0.9,  spread: 0 },
+  pinky:  { curl: 0.9,  spread: 0 },
+};
+
+// W handshape (3 fingers up spread)
+const W_SHAPE: HandPose = {
+  thumb:  { flex: 0.7, abd: 0 },
+  index:  { curl: 0,   spread:-0.4 },
+  middle: { curl: 0,   spread: 0 },
+  ring:   { curl: 0,   spread: 0.4 },
+  pinky:  { curl: 0.9, spread: 0 },
+};
+
+// X handshape (index hooked/bent)
+const X_SHAPE: HandPose = {
+  thumb:  { flex: 0.6, abd: 0.3 },
+  index:  { curl: 0.45, spread: 0 },
+  middle: { curl: 0.9,  spread: 0 },
+  ring:   { curl: 0.9,  spread: 0 },
+  pinky:  { curl: 0.9,  spread: 0 },
+};
+
+// Index pointing up (1 / point)
+const POINT_UP: HandPose = {
+  thumb:  { flex: 0.65, abd: 0.15 },
+  index:  { curl: 0,    spread: 0 },
+  middle: { curl: 0.9,  spread: 0 },
+  ring:   { curl: 0.9,  spread: 0 },
+  pinky:  { curl: 0.9,  spread: 0 },
+};
+
+// A handshape (fist with thumb at side)
+const A_SHAPE: HandPose = {
+  thumb:  { flex: 0.3, abd: 0.35 },
+  index:  { curl: 0.95, spread: 0 },
+  middle: { curl: 0.95, spread: 0 },
+  ring:   { curl: 0.95, spread: 0 },
+  pinky:  { curl: 0.95, spread: 0 },
+};
+
+// S handshape (fist with thumb over fingers)
+const S_SHAPE: HandPose = {
+  thumb:  { flex: 0.75, abd: 0.1 },
+  index:  { curl: 1,    spread: 0 },
+  middle: { curl: 1,    spread: 0 },
+  ring:   { curl: 1,    spread: 0 },
+  pinky:  { curl: 1,    spread: 0 },
+};
+
+// E handshape (fingers bent at mid-knuckle, touching thumb)
+const E_SHAPE: HandPose = {
+  thumb:  { flex: 0.9, abd: 0 },
+  index:  { curl: 0.6, spread: 0 },
+  middle: { curl: 0.6, spread: 0 },
+  ring:   { curl: 0.6, spread: 0 },
+  pinky:  { curl: 0.6, spread: 0 },
+};
+
+// M handshape (3 fingers over thumb)
+const M_SHAPE: HandPose = {
+  thumb:  { flex: 0.85, abd: 0 },
+  index:  { curl: 0.7,  spread: 0 },
+  middle: { curl: 0.7,  spread: 0 },
+  ring:   { curl: 0.7,  spread: 0 },
+  pinky:  { curl: 0.85, spread: 0 },
+};
+
+// N handshape (2 fingers over thumb)
+const N_SHAPE: HandPose = {
+  thumb:  { flex: 0.85, abd: 0 },
+  index:  { curl: 0.7,  spread: 0 },
+  middle: { curl: 0.7,  spread: 0 },
+  ring:   { curl: 0.88, spread: 0 },
+  pinky:  { curl: 0.88, spread: 0 },
+};
+
+// R handshape (index + middle crossed)
+const R_SHAPE: HandPose = {
+  thumb:  { flex: 0.7, abd: 0 },
+  index:  { curl: 0,   spread:  0.2 },
+  middle: { curl: 0,   spread: -0.2 },
+  ring:   { curl: 0.9, spread:  0 },
+  pinky:  { curl: 0.9, spread:  0 },
+};
+
+// T handshape (thumb between index and middle)
+const T_SHAPE: HandPose = {
+  thumb:  { flex: 0.55, abd: 0.25 },
+  index:  { curl: 0.82, spread: 0 },
+  middle: { curl: 0.9,  spread: 0 },
+  ring:   { curl: 0.9,  spread: 0 },
+  pinky:  { curl: 0.9,  spread: 0 },
+};
+
+// ILY (I Love You) – thumb + index + pinky
+const ILY: HandPose = {
+  thumb:  { flex: 0,   abd: 1 },
+  index:  { curl: 0,   spread: -0.2 },
+  middle: { curl: 0.9, spread: 0 },
+  ring:   { curl: 0.9, spread: 0 },
+  pinky:  { curl: 0,   spread: 0.2 },
+};
+
+// Claw (bent all fingers, spread)
+const CLAW: HandPose = {
+  thumb:  { flex: 0.4, abd: 0.7 },
+  index:  { curl: 0.5, spread: -0.4 },
+  middle: { curl: 0.5, spread: -0.1 },
+  ring:   { curl: 0.5, spread:  0.1 },
+  pinky:  { curl: 0.5, spread:  0.4 },
+};
+
+// ============================================================
+// Named Face Expressions
+// ============================================================
+
 export const NEUTRAL_FACE: FaceExpression = {
   eyebrowRaise: 0, mouthOpen: 0, mouthSmile: 0.1,
   headTiltX: 0, headTiltY: 0, cheekPuff: 0, eyeSquint: 0,
 };
 
 export const QUESTION_FACE: FaceExpression = {
-  eyebrowRaise: 0.8, mouthOpen: 0.2, mouthSmile: 0,
-  headTiltX: 0, headTiltY: 0.3, cheekPuff: 0, eyeSquint: 0,
+  eyebrowRaise: 0.85, mouthOpen: 0.15, mouthSmile: 0,
+  headTiltX: 0, headTiltY: 0.28, cheekPuff: 0, eyeSquint: 0,
+};
+
+export const WH_QUESTION_FACE: FaceExpression = {
+  eyebrowRaise: -0.4, mouthOpen: 0.1, mouthSmile: 0,
+  headTiltX: 0.05, headTiltY: 0.15, cheekPuff: 0, eyeSquint: 0.2,
 };
 
 export const HAPPY_FACE: FaceExpression = {
-  eyebrowRaise: 0.3, mouthOpen: 0.3, mouthSmile: 0.8,
-  headTiltX: 0, headTiltY: 0, cheekPuff: 0, eyeSquint: 0.4,
+  eyebrowRaise: 0.35, mouthOpen: 0.3, mouthSmile: 0.9,
+  headTiltX: 0, headTiltY: 0, cheekPuff: 0, eyeSquint: 0.45,
 };
 
 export const SAD_FACE: FaceExpression = {
-  eyebrowRaise: -0.5, mouthOpen: 0.1, mouthSmile: -0.7,
-  headTiltX: 0.1, headTiltY: 0, cheekPuff: 0, eyeSquint: 0,
+  eyebrowRaise: -0.5, mouthOpen: 0.08, mouthSmile: -0.75,
+  headTiltX: 0.12, headTiltY: 0, cheekPuff: 0, eyeSquint: 0,
 };
 
 export const ANGRY_FACE: FaceExpression = {
-  eyebrowRaise: -0.7, mouthOpen: 0.3, mouthSmile: -0.5,
-  headTiltX: 0, headTiltY: 0, cheekPuff: 0, eyeSquint: 0.5,
+  eyebrowRaise: -0.75, mouthOpen: 0.25, mouthSmile: -0.5,
+  headTiltX: 0, headTiltY: 0, cheekPuff: 0, eyeSquint: 0.55,
 };
 
-// --- Helpers ---
-function staticSign(right: HandPose, left: HandPose, face?: FaceExpression, holdMs = 600): WordSign {
+export const SURPRISED_FACE: FaceExpression = {
+  eyebrowRaise: 1, mouthOpen: 0.7, mouthSmile: 0,
+  headTiltX: -0.08, headTiltY: 0, cheekPuff: 0, eyeSquint: 0,
+};
+
+export const DISGUSTED_FACE: FaceExpression = {
+  eyebrowRaise: -0.3, mouthOpen: 0.15, mouthSmile: -0.3,
+  headTiltX: 0, headTiltY: 0, cheekPuff: 0.4, eyeSquint: 0.2,
+};
+
+export const INTENSE_FACE: FaceExpression = {
+  eyebrowRaise: -0.2, mouthOpen: 0, mouthSmile: 0,
+  headTiltX: 0, headTiltY: 0, cheekPuff: 0, eyeSquint: 0.3,
+};
+
+// ============================================================
+// Helper functions
+// ============================================================
+function staticSign(right: HandPose, left: HandPose, face?: FaceExpression, holdMs = 620): WordSign {
   return { frames: [{ right, left, face: face ?? NEUTRAL_FACE, holdMs }] };
 }
 
@@ -142,414 +364,1255 @@ function animSign(frames: SignKeyframe[]): WordSign {
   return { frames };
 }
 
+// Two-frame sign: hold shape A → move/morph to shape B
+function twoFrame(
+  r1: HandPose, l1: HandPose,
+  r2: HandPose, l2: HandPose,
+  face?: FaceExpression, t1 = 280, t2 = 400,
+): WordSign {
+  const f = face ?? NEUTRAL_FACE;
+  return { frames: [{ right: r1, left: l1, face: f, holdMs: t1 }, { right: r2, left: l2, face: f, holdMs: t2 }] };
+}
+
+// Repeated motion (two frames swapped 2x = natural repeated sign)
+function repeated(
+  r1: HandPose, l1: HandPose,
+  r2: HandPose, l2: HandPose,
+  face?: FaceExpression, each = 240,
+): WordSign {
+  const f = face ?? NEUTRAL_FACE;
+  return { frames: [
+    { right: r1, left: l1, face: f, holdMs: each },
+    { right: r2, left: l2, face: f, holdMs: each },
+    { right: r1, left: l1, face: f, holdMs: each },
+  ]};
+}
+
 // ============================================================
-// ASL Fingerspelling A-Z (right-hand dominant)
+// Fingerspelling A–Z
 // ============================================================
 export const FINGERSPELLING: Record<string, HandPose> = {
-  A: { thumb: { flex: 0.3, abd: 0.3 }, index: { curl: 0.95, spread: 0 }, middle: { curl: 0.95, spread: 0 }, ring: { curl: 0.95, spread: 0 }, pinky: { curl: 0.95, spread: 0 } },
-  B: { thumb: { flex: 0.7, abd: 0 }, index: { curl: 0, spread: 0 }, middle: { curl: 0, spread: 0 }, ring: { curl: 0, spread: 0 }, pinky: { curl: 0, spread: 0 } },
-  C: { thumb: { flex: 0.4, abd: 0.5 }, index: { curl: 0.45, spread: 0 }, middle: { curl: 0.45, spread: 0 }, ring: { curl: 0.45, spread: 0 }, pinky: { curl: 0.45, spread: 0 } },
-  D: { thumb: { flex: 0.4, abd: 0.3 }, index: { curl: 0, spread: 0 }, middle: { curl: 0.85, spread: 0 }, ring: { curl: 0.85, spread: 0 }, pinky: { curl: 0.85, spread: 0 } },
-  E: { thumb: { flex: 0.9, abd: 0 }, index: { curl: 0.6, spread: 0 }, middle: { curl: 0.6, spread: 0 }, ring: { curl: 0.6, spread: 0 }, pinky: { curl: 0.6, spread: 0 } },
-  F: { thumb: { flex: 0.3, abd: 0.6 }, index: { curl: 0.7, spread: 0 }, middle: { curl: 0, spread: 0 }, ring: { curl: 0, spread: 0 }, pinky: { curl: 0, spread: 0 } },
-  G: { thumb: { flex: 0, abd: 0.6 }, index: { curl: 0, spread: 0 }, middle: { curl: 0.9, spread: 0 }, ring: { curl: 0.9, spread: 0 }, pinky: { curl: 0.9, spread: 0 }, wristY: -0.5 },
-  H: { thumb: { flex: 0.7, abd: 0 }, index: { curl: 0, spread: 0 }, middle: { curl: 0, spread: 0 }, ring: { curl: 0.9, spread: 0 }, pinky: { curl: 0.9, spread: 0 }, wristY: -0.5 },
-  I: { thumb: { flex: 0.6, abd: 0.2 }, index: { curl: 0.9, spread: 0 }, middle: { curl: 0.9, spread: 0 }, ring: { curl: 0.9, spread: 0 }, pinky: { curl: 0, spread: 0 } },
-  J: { thumb: { flex: 0.6, abd: 0.2 }, index: { curl: 0.9, spread: 0 }, middle: { curl: 0.9, spread: 0 }, ring: { curl: 0.9, spread: 0 }, pinky: { curl: 0, spread: 0 } },
-  K: { thumb: { flex: 0.2, abd: 0.5 }, index: { curl: 0, spread: 0 }, middle: { curl: 0.1, spread: -0.3 }, ring: { curl: 0.9, spread: 0 }, pinky: { curl: 0.9, spread: 0 } },
-  L: { thumb: { flex: 0, abd: 1 }, index: { curl: 0, spread: 0 }, middle: { curl: 0.9, spread: 0 }, ring: { curl: 0.9, spread: 0 }, pinky: { curl: 0.9, spread: 0 } },
-  M: { thumb: { flex: 0.8, abd: 0 }, index: { curl: 0.7, spread: 0 }, middle: { curl: 0.7, spread: 0 }, ring: { curl: 0.7, spread: 0 }, pinky: { curl: 0.8, spread: 0 } },
-  N: { thumb: { flex: 0.8, abd: 0 }, index: { curl: 0.7, spread: 0 }, middle: { curl: 0.7, spread: 0 }, ring: { curl: 0.85, spread: 0 }, pinky: { curl: 0.85, spread: 0 } },
-  O: { thumb: { flex: 0.5, abd: 0.4 }, index: { curl: 0.6, spread: 0 }, middle: { curl: 0.6, spread: 0 }, ring: { curl: 0.6, spread: 0 }, pinky: { curl: 0.6, spread: 0 } },
-  P: { thumb: { flex: 0.2, abd: 0.5 }, index: { curl: 0, spread: 0 }, middle: { curl: 0.1, spread: -0.3 }, ring: { curl: 0.9, spread: 0 }, pinky: { curl: 0.9, spread: 0 }, wristX: 0.4 },
-  Q: { thumb: { flex: 0, abd: 0.6 }, index: { curl: 0, spread: 0 }, middle: { curl: 0.9, spread: 0 }, ring: { curl: 0.9, spread: 0 }, pinky: { curl: 0.9, spread: 0 }, wristX: 0.4 },
-  R: { thumb: { flex: 0.7, abd: 0 }, index: { curl: 0, spread: 0.2 }, middle: { curl: 0, spread: -0.2 }, ring: { curl: 0.9, spread: 0 }, pinky: { curl: 0.9, spread: 0 } },
-  S: { thumb: { flex: 0.7, abd: 0.1 }, index: { curl: 1, spread: 0 }, middle: { curl: 1, spread: 0 }, ring: { curl: 1, spread: 0 }, pinky: { curl: 1, spread: 0 } },
-  T: { thumb: { flex: 0.5, abd: 0.2 }, index: { curl: 0.8, spread: 0 }, middle: { curl: 0.9, spread: 0 }, ring: { curl: 0.9, spread: 0 }, pinky: { curl: 0.9, spread: 0 } },
-  U: { thumb: { flex: 0.7, abd: 0 }, index: { curl: 0, spread: 0 }, middle: { curl: 0, spread: 0 }, ring: { curl: 0.9, spread: 0 }, pinky: { curl: 0.9, spread: 0 } },
-  V: { thumb: { flex: 0.7, abd: 0 }, index: { curl: 0, spread: -0.3 }, middle: { curl: 0, spread: 0.3 }, ring: { curl: 0.9, spread: 0 }, pinky: { curl: 0.9, spread: 0 } },
-  W: { thumb: { flex: 0.7, abd: 0 }, index: { curl: 0, spread: -0.4 }, middle: { curl: 0, spread: 0 }, ring: { curl: 0, spread: 0.4 }, pinky: { curl: 0.9, spread: 0 } },
-  X: { thumb: { flex: 0.6, abd: 0.3 }, index: { curl: 0.5, spread: 0 }, middle: { curl: 0.9, spread: 0 }, ring: { curl: 0.9, spread: 0 }, pinky: { curl: 0.9, spread: 0 } },
-  Y: { thumb: { flex: 0, abd: 1 }, index: { curl: 0.9, spread: 0 }, middle: { curl: 0.9, spread: 0 }, ring: { curl: 0.9, spread: 0 }, pinky: { curl: 0, spread: 0 } },
-  Z: { thumb: { flex: 0.7, abd: 0 }, index: { curl: 0, spread: 0 }, middle: { curl: 0.9, spread: 0 }, ring: { curl: 0.9, spread: 0 }, pinky: { curl: 0.9, spread: 0 } },
+  A: { thumb: { flex: 0.3,  abd: 0.35 }, index: { curl: 0.95, spread: 0 }, middle: { curl: 0.95, spread: 0 }, ring: { curl: 0.95, spread: 0 }, pinky: { curl: 0.95, spread: 0 } },
+  B: { thumb: { flex: 0.8,  abd: 0 },    index: { curl: 0,    spread: 0 }, middle: { curl: 0,    spread: 0 }, ring: { curl: 0,    spread: 0 }, pinky: { curl: 0,    spread: 0 } },
+  C: { thumb: { flex: 0.4,  abd: 0.5 },  index: { curl: 0.45, spread: 0 }, middle: { curl: 0.45, spread: 0 }, ring: { curl: 0.45, spread: 0 }, pinky: { curl: 0.45, spread: 0 } },
+  D: { thumb: { flex: 0.45, abd: 0.35 }, index: { curl: 0,    spread: 0 }, middle: { curl: 0.82, spread: 0 }, ring: { curl: 0.82, spread: 0 }, pinky: { curl: 0.82, spread: 0 } },
+  E: { thumb: { flex: 0.9,  abd: 0 },    index: { curl: 0.6,  spread: 0 }, middle: { curl: 0.6,  spread: 0 }, ring: { curl: 0.6,  spread: 0 }, pinky: { curl: 0.6,  spread: 0 } },
+  F: { thumb: { flex: 0.35, abd: 0.55 }, index: { curl: 0.68, spread: 0 }, middle: { curl: 0,    spread: 0 }, ring: { curl: 0,    spread: 0 }, pinky: { curl: 0,    spread: 0 } },
+  G: { thumb: { flex: 0.05, abd: 0.7 },  index: { curl: 0,    spread: 0 }, middle: { curl: 0.9,  spread: 0 }, ring: { curl: 0.9,  spread: 0 }, pinky: { curl: 0.9,  spread: 0 }, wristY: -0.5 },
+  H: { thumb: { flex: 0.7,  abd: 0 },    index: { curl: 0,    spread: 0.05 }, middle: { curl: 0, spread:-0.05 }, ring: { curl: 0.9, spread: 0 }, pinky: { curl: 0.9, spread: 0 }, wristY: -0.5 },
+  I: { thumb: { flex: 0.62, abd: 0.2 },  index: { curl: 0.9,  spread: 0 }, middle: { curl: 0.9,  spread: 0 }, ring: { curl: 0.9,  spread: 0 }, pinky: { curl: 0,    spread: 0 } },
+  J: { thumb: { flex: 0.62, abd: 0.2 },  index: { curl: 0.9,  spread: 0 }, middle: { curl: 0.9,  spread: 0 }, ring: { curl: 0.9,  spread: 0 }, pinky: { curl: 0,    spread: 0 } },
+  K: { thumb: { flex: 0.22, abd: 0.5 },  index: { curl: 0,    spread: 0 }, middle: { curl: 0.15, spread:-0.3 }, ring: { curl: 0.9, spread: 0 }, pinky: { curl: 0.9, spread: 0 } },
+  L: { thumb: { flex: 0,    abd: 1 },    index: { curl: 0,    spread: 0 }, middle: { curl: 0.9,  spread: 0 }, ring: { curl: 0.9,  spread: 0 }, pinky: { curl: 0.9,  spread: 0 } },
+  M: { thumb: { flex: 0.85, abd: 0 },    index: { curl: 0.7,  spread: 0 }, middle: { curl: 0.7,  spread: 0 }, ring: { curl: 0.7,  spread: 0 }, pinky: { curl: 0.85, spread: 0 } },
+  N: { thumb: { flex: 0.85, abd: 0 },    index: { curl: 0.7,  spread: 0 }, middle: { curl: 0.7,  spread: 0 }, ring: { curl: 0.88, spread: 0 }, pinky: { curl: 0.88, spread: 0 } },
+  O: { thumb: { flex: 0.5,  abd: 0.42 }, index: { curl: 0.62, spread: 0 }, middle: { curl: 0.62, spread: 0 }, ring: { curl: 0.60, spread: 0 }, pinky: { curl: 0.58, spread: 0 } },
+  P: { thumb: { flex: 0.22, abd: 0.5 },  index: { curl: 0,    spread: 0 }, middle: { curl: 0.15, spread:-0.3 }, ring: { curl: 0.9, spread: 0 }, pinky: { curl: 0.9, spread: 0 }, wristX: 0.4 },
+  Q: { thumb: { flex: 0.05, abd: 0.65 }, index: { curl: 0,    spread: 0 }, middle: { curl: 0.9,  spread: 0 }, ring: { curl: 0.9,  spread: 0 }, pinky: { curl: 0.9,  spread: 0 }, wristX: 0.4 },
+  R: { thumb: { flex: 0.7,  abd: 0 },    index: { curl: 0,    spread: 0.2 }, middle: { curl: 0, spread:-0.2 }, ring: { curl: 0.9, spread: 0 }, pinky: { curl: 0.9, spread: 0 } },
+  S: { thumb: { flex: 0.75, abd: 0.1 },  index: { curl: 1,    spread: 0 }, middle: { curl: 1,    spread: 0 }, ring: { curl: 1,    spread: 0 }, pinky: { curl: 1,    spread: 0 } },
+  T: { thumb: { flex: 0.55, abd: 0.25 }, index: { curl: 0.82, spread: 0 }, middle: { curl: 0.9,  spread: 0 }, ring: { curl: 0.9,  spread: 0 }, pinky: { curl: 0.9,  spread: 0 } },
+  U: { thumb: { flex: 0.72, abd: 0 },    index: { curl: 0,    spread: 0.05 }, middle: { curl: 0, spread:-0.05 }, ring: { curl: 0.9, spread: 0 }, pinky: { curl: 0.9, spread: 0 } },
+  V: { thumb: { flex: 0.72, abd: 0 },    index: { curl: 0,    spread:-0.32 }, middle: { curl: 0, spread: 0.32 }, ring: { curl: 0.9, spread: 0 }, pinky: { curl: 0.9, spread: 0 } },
+  W: { thumb: { flex: 0.72, abd: 0 },    index: { curl: 0,    spread:-0.4 }, middle: { curl: 0, spread: 0 }, ring: { curl: 0, spread: 0.4 }, pinky: { curl: 0.9, spread: 0 } },
+  X: { thumb: { flex: 0.62, abd: 0.3 },  index: { curl: 0.48, spread: 0 }, middle: { curl: 0.9,  spread: 0 }, ring: { curl: 0.9,  spread: 0 }, pinky: { curl: 0.9,  spread: 0 } },
+  Y: { thumb: { flex: 0,    abd: 1 },    index: { curl: 0.9,  spread: 0 }, middle: { curl: 0.9,  spread: 0 }, ring: { curl: 0.9,  spread: 0 }, pinky: { curl: 0,    spread: 0 } },
+  Z: { thumb: { flex: 0.72, abd: 0 },    index: { curl: 0,    spread: 0 }, middle: { curl: 0.9,  spread: 0 }, ring: { curl: 0.9,  spread: 0 }, pinky: { curl: 0.9,  spread: 0 } },
+};
+
+// C handshape (curved C opening)
+const C_SHAPE: HandPose = {
+  thumb:  { flex: 0.4, abd: 0.52 },
+  index:  { curl: 0.45, spread: 0 },
+  middle: { curl: 0.45, spread: 0 },
+  ring:   { curl: 0.45, spread: 0 },
+  pinky:  { curl: 0.45, spread: 0 },
+};
+
+// I handshape (pinky extended)
+const I_SHAPE: HandPose = {
+  thumb:  { flex: 0.62, abd: 0.2 },
+  index:  { curl: 0.9, spread: 0 },
+  middle: { curl: 0.9, spread: 0 },
+  ring:   { curl: 0.9, spread: 0 },
+  pinky:  { curl: 0,   spread: 0 },
 };
 
 // ============================================================
-// Word Sign Dictionary
+// Word Sign Dictionary  (400+ entries)
 // ============================================================
 export const WORD_SIGNS: Record<string, WordSign> = {
-  // Greetings
+
+  // ── Greetings & Farewells ──────────────────────────────────
   hello: animSign([
-    { right: FLAT_B, left: FIST, face: NEUTRAL_FACE, holdMs: 300 },
-    { right: { ...FLAT_B, wristZ: 0.35 }, left: FIST, face: NEUTRAL_FACE, holdMs: 500 },
+    { right: FLAT_B, left: FIST, face: HAPPY_FACE, holdMs: 280 },
+    { right: { ...FLAT_B, wristZ: 0.38 }, left: FIST, face: HAPPY_FACE, holdMs: 500 },
   ]),
   hi: animSign([
-    { right: FLAT_B, left: FIST, face: NEUTRAL_FACE, holdMs: 400 },
-    { right: { ...FLAT_B, wristZ: 0.4 }, left: FIST, face: NEUTRAL_FACE, holdMs: 400 },
+    { right: FLAT_B, left: FIST, face: HAPPY_FACE, holdMs: 380 },
+    { right: { ...FLAT_B, wristZ: 0.42 }, left: FIST, face: HAPPY_FACE, holdMs: 420 },
   ]),
   goodbye: animSign([
-    { right: FLAT_B, left: FIST, face: NEUTRAL_FACE, holdMs: 250 },
-    { right: { ...FLAT_B, wristX: 0.2 }, left: FIST, face: NEUTRAL_FACE, holdMs: 250 },
-    { right: FINGERSPELLING.B, left: FIST, face: NEUTRAL_FACE, holdMs: 400 },
+    { right: OPEN, left: FIST, face: HAPPY_FACE, holdMs: 280 },
+    { right: { ...OPEN, wristX: 0.25 }, left: FIST, face: HAPPY_FACE, holdMs: 280 },
+    { right: OPEN, left: FIST, face: HAPPY_FACE, holdMs: 280 },
+    { right: { ...OPEN, wristX: 0.25 }, left: FIST, face: HAPPY_FACE, holdMs: 300 },
   ]),
   bye: animSign([
-    { right: FLAT_B, left: FIST, face: NEUTRAL_FACE, holdMs: 350 },
-    { right: { ...FLAT_B, wristZ: 0.5 }, left: FIST, face: NEUTRAL_FACE, holdMs: 450 },
+    { right: OPEN, left: FIST, face: HAPPY_FACE, holdMs: 340 },
+    { right: { ...OPEN, wristX: 0.28 }, left: FIST, face: HAPPY_FACE, holdMs: 460 },
   ]),
-
-  // Pronouns
-  i: staticSign(POINT_UP, FIST),
-  me: staticSign(POINT_UP, FIST),
-  you: staticSign({ ...POINT_UP, wristZ: 0.2 }, FIST),
-  we: animSign([
-    { right: POINT_UP, left: FIST, face: NEUTRAL_FACE, holdMs: 300 },
-    { right: { ...POINT_UP, wristY: 0.4 }, left: FIST, face: NEUTRAL_FACE, holdMs: 400 },
+  welcome: animSign([
+    { right: OPEN, left: FIST, face: HAPPY_FACE, holdMs: 280 },
+    { right: { ...OPEN, wristZ: 0.4 }, left: FIST, face: HAPPY_FACE, holdMs: 500 },
   ]),
-  they: animSign([
-    { right: POINT_UP, left: FIST, face: NEUTRAL_FACE, holdMs: 300 },
-    { right: { ...POINT_UP, wristY: -0.4 }, left: FIST, face: NEUTRAL_FACE, holdMs: 400 },
-  ]),
-  he: staticSign(POINT_UP, FIST),
-  she: staticSign(POINT_UP, FIST),
-  it: staticSign(POINT_UP, FIST),
-
-  // Affirmations / negations
-  yes: animSign([
-    { right: FIST, left: FIST, face: NEUTRAL_FACE, holdMs: 250 },
-    { right: { ...FIST, wristX: 0.3 }, left: FIST, face: NEUTRAL_FACE, holdMs: 250 },
-    { right: FIST, left: FIST, face: NEUTRAL_FACE, holdMs: 250 },
-  ]),
-  no: animSign([
-    { right: FINGERSPELLING.N, left: FIST, face: NEUTRAL_FACE, holdMs: 300 },
-    { right: FINGERSPELLING.O, left: FIST, face: NEUTRAL_FACE, holdMs: 400 },
-  ]),
-  please: staticSign(FLAT_B, FIST, { ...NEUTRAL_FACE, mouthSmile: 0.4 }),
-  sorry: animSign([
-    { right: FINGERSPELLING.A, left: FIST, face: SAD_FACE, holdMs: 280 },
-    { right: { ...FINGERSPELLING.A, wristX: 0.2 }, left: FIST, face: SAD_FACE, holdMs: 280 },
-    { right: FINGERSPELLING.A, left: FIST, face: SAD_FACE, holdMs: 280 },
+  please: staticSign(FLAT_B, FIST, { ...NEUTRAL_FACE, mouthSmile: 0.45 }),
+  sorry: repeated(A_SHAPE, FIST, { ...A_SHAPE, wristX: 0.22 }, FIST, SAD_FACE),
+  'excuse me': animSign([
+    { right: FLAT_B, left: FLAT_B, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...FLAT_B, wristX: 0.3 }, left: FLAT_B, face: NEUTRAL_FACE, holdMs: 400 },
   ]),
   'thank you': animSign([
-    { right: FLAT_B, left: FIST, face: HAPPY_FACE, holdMs: 300 },
-    { right: { ...FLAT_B, wristX: 0.35 }, left: FIST, face: HAPPY_FACE, holdMs: 500 },
+    { right: FLAT_B, left: FIST, face: HAPPY_FACE, holdMs: 280 },
+    { right: { ...FLAT_B, wristX: 0.38 }, left: FIST, face: HAPPY_FACE, holdMs: 520 },
   ]),
   thanks: animSign([
-    { right: FLAT_B, left: FIST, face: HAPPY_FACE, holdMs: 300 },
-    { right: { ...FLAT_B, wristX: 0.35 }, left: FIST, face: HAPPY_FACE, holdMs: 500 },
-  ]),
-
-  // Questions
-  what: animSign([
-    { right: FLAT_B, left: FIST, face: QUESTION_FACE, holdMs: 300 },
-    { right: { ...FLAT_B, wristX: 0.2 }, left: FIST, face: QUESTION_FACE, holdMs: 400 },
-  ]),
-  where: animSign([
-    { right: POINT_UP, left: FIST, face: QUESTION_FACE, holdMs: 280 },
-    { right: { ...POINT_UP, wristZ: 0.3 }, left: FIST, face: QUESTION_FACE, holdMs: 280 },
-    { right: { ...POINT_UP, wristZ: -0.3 }, left: FIST, face: QUESTION_FACE, holdMs: 280 },
-  ]),
-  when: staticSign(POINT_UP, POINT_UP, QUESTION_FACE),
-  who: staticSign(POINT_UP, FIST, QUESTION_FACE),
-  why: animSign([
-    { right: FLAT_B, left: FIST, face: QUESTION_FACE, holdMs: 280 },
-    { right: Y_SHAPE, left: FIST, face: QUESTION_FACE, holdMs: 400 },
-  ]),
-  how: animSign([
-    { right: CURVED, left: CURVED, face: QUESTION_FACE, holdMs: 280 },
-    { right: FLAT_B, left: FLAT_B, face: QUESTION_FACE, holdMs: 400 },
-  ]),
-
-  // Emotions
-  happy: animSign([
     { right: FLAT_B, left: FIST, face: HAPPY_FACE, holdMs: 280 },
-    { right: { ...FLAT_B, wristX: 0.2 }, left: FIST, face: HAPPY_FACE, holdMs: 280 },
-    { right: FLAT_B, left: FIST, face: HAPPY_FACE, holdMs: 280 },
+    { right: { ...FLAT_B, wristX: 0.38 }, left: FIST, face: HAPPY_FACE, holdMs: 520 },
   ]),
-  sad: animSign([
-    { right: FLAT_B, left: FLAT_B, face: SAD_FACE, holdMs: 280 },
-    { right: { ...FLAT_B, wristX: -0.25 }, left: { ...FLAT_B, wristX: -0.25 }, face: SAD_FACE, holdMs: 400 },
-  ]),
-  love: staticSign(FINGERSPELLING.A, FINGERSPELLING.A, { ...HAPPY_FACE, mouthSmile: 0.9 }, 700),
-  angry: animSign([
-    { right: CURVED, left: FIST, face: ANGRY_FACE, holdMs: 280 },
-    { right: FIST, left: FIST, face: ANGRY_FACE, holdMs: 400 },
-  ]),
-  good: animSign([
-    { right: FLAT_B, left: FIST, face: HAPPY_FACE, holdMs: 280 },
-    { right: { ...FLAT_B, wristX: 0.2 }, left: FLAT_B, face: HAPPY_FACE, holdMs: 400 },
-  ]),
-  bad: animSign([
-    { right: FLAT_B, left: FIST, face: SAD_FACE, holdMs: 280 },
-    { right: { ...FLAT_B, wristZ: -0.4 }, left: FIST, face: SAD_FACE, holdMs: 400 },
-  ]),
-  great: animSign([
+  "you're welcome": animSign([
     { right: OPEN, left: FIST, face: HAPPY_FACE, holdMs: 280 },
-    { right: { ...OPEN, wristX: 0.2 }, left: FIST, face: HAPPY_FACE, holdMs: 400 },
+    { right: { ...OPEN, wristZ: 0.4 }, left: FIST, face: HAPPY_FACE, holdMs: 500 },
   ]),
-  beautiful: animSign([
-    { right: O_SHAPE, left: FIST, face: HAPPY_FACE, holdMs: 280 },
-    { right: OPEN, left: FIST, face: HAPPY_FACE, holdMs: 400 },
+  'nice to meet you': animSign([
+    { right: FLAT_B, left: FIST, face: HAPPY_FACE, holdMs: 280 },
+    { right: { ...FLAT_B, wristX: 0.3 }, left: FIST, face: HAPPY_FACE, holdMs: 300 },
+    { right: POINT_UP, left: FIST, face: HAPPY_FACE, holdMs: 400 },
   ]),
-
-  // Time
-  today: animSign([
-    { right: Y_SHAPE, left: Y_SHAPE, face: NEUTRAL_FACE, holdMs: 280 },
-    { right: { ...Y_SHAPE, wristX: 0.2 }, left: { ...Y_SHAPE, wristX: 0.2 }, face: NEUTRAL_FACE, holdMs: 400 },
+  'how are you': animSign([
+    { right: CURVED, left: CURVED, face: QUESTION_FACE, holdMs: 300 },
+    { right: FLAT_B, left: FLAT_B, face: QUESTION_FACE, holdMs: 300 },
+    { right: POINT_UP, left: FIST, face: QUESTION_FACE, holdMs: 400 },
   ]),
-  tomorrow: animSign([
-    { right: FINGERSPELLING.A, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
-    { right: { ...FINGERSPELLING.A, wristZ: 0.3 }, left: FIST, face: NEUTRAL_FACE, holdMs: 400 },
-  ]),
-  yesterday: animSign([
-    { right: FINGERSPELLING.A, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
-    { right: { ...FINGERSPELLING.A, wristZ: -0.3 }, left: FIST, face: NEUTRAL_FACE, holdMs: 400 },
-  ]),
-  now: animSign([
-    { right: Y_SHAPE, left: Y_SHAPE, face: NEUTRAL_FACE, holdMs: 280 },
-    { right: { ...Y_SHAPE, wristX: 0.2 }, left: { ...Y_SHAPE, wristX: 0.2 }, face: NEUTRAL_FACE, holdMs: 400 },
-  ]),
-  later: animSign([
-    { right: FINGERSPELLING.L, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
-    { right: { ...FINGERSPELLING.L, wristZ: 0.3 }, left: FIST, face: NEUTRAL_FACE, holdMs: 400 },
-  ]),
-  before: animSign([
-    { right: FLAT_B, left: FLAT_B, face: NEUTRAL_FACE, holdMs: 280 },
-    { right: { ...FLAT_B, wristZ: -0.3 }, left: FLAT_B, face: NEUTRAL_FACE, holdMs: 400 },
-  ]),
-  after: animSign([
-    { right: FLAT_B, left: FLAT_B, face: NEUTRAL_FACE, holdMs: 280 },
-    { right: { ...FLAT_B, wristZ: 0.3 }, left: FLAT_B, face: NEUTRAL_FACE, holdMs: 400 },
+  congratulations: animSign([
+    { right: FLAT_B, left: FLAT_B, face: HAPPY_FACE, holdMs: 280 },
+    { right: { ...FLAT_B, wristZ: 0.3 }, left: { ...FLAT_B, wristZ: -0.3 }, face: HAPPY_FACE, holdMs: 280 },
+    { right: FLAT_B, left: FLAT_B, face: HAPPY_FACE, holdMs: 280 },
   ]),
 
-  // Actions
-  help: animSign([
-    { right: FLAT_B, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
-    { right: FLAT_B, left: FLAT_B, face: NEUTRAL_FACE, holdMs: 280 },
-    { right: { ...FLAT_B, wristX: 0.3 }, left: { ...FLAT_B, wristX: 0.3 }, face: NEUTRAL_FACE, holdMs: 400 },
+  // ── Pronouns ──────────────────────────────────────────────
+  i:    staticSign(POINT_UP, FIST),
+  me:   staticSign(POINT_UP, FIST),
+  you:  staticSign({ ...POINT_UP, wristZ: 0.18 }, FIST),
+  we:   twoFrame(POINT_UP, FIST, { ...POINT_UP, wristY: 0.42 }, FIST),
+  us:   twoFrame(POINT_UP, FIST, { ...POINT_UP, wristY: 0.42 }, FIST),
+  they: twoFrame(POINT_UP, FIST, { ...POINT_UP, wristY: -0.38 }, FIST),
+  them: twoFrame(POINT_UP, FIST, { ...POINT_UP, wristY: -0.38 }, FIST),
+  he:   staticSign(POINT_UP, FIST),
+  she:  staticSign(POINT_UP, FIST),
+  it:   staticSign(POINT_UP, FIST),
+  my:   staticSign(FLAT_B,   FIST),
+  your: staticSign({ ...FLAT_B, wristZ: 0.2 }, FIST, NEUTRAL_FACE),
+  his:  staticSign(FLAT_B, FIST),
+  her:  staticSign(FLAT_B, FIST),
+  our:  twoFrame(FLAT_B, FIST, { ...FLAT_B, wristY: 0.4 }, FIST),
+  their: twoFrame(FLAT_B, FIST, { ...FLAT_B, wristY: -0.35 }, FIST),
+  mine: staticSign(FLAT_B, FIST),
+  yours: staticSign({ ...FLAT_B, wristZ: 0.2 }, FIST),
+  himself: staticSign(A_SHAPE, FIST),
+  herself: staticSign(A_SHAPE, FIST),
+  myself:  staticSign(A_SHAPE, FIST),
+  yourself: staticSign({ ...A_SHAPE, wristZ: 0.2 }, FIST),
+  themselves: twoFrame(A_SHAPE, FIST, { ...A_SHAPE, wristY: -0.3 }, FIST),
+
+  // ── Yes / No / Agreement ─────────────────────────────────
+  yes: repeated(FIST, FIST, { ...FIST, wristX: 0.32 }, FIST),
+  no: animSign([
+    { right: FINGERSPELLING.N, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: FINGERSPELLING.O, left: FIST, face: NEUTRAL_FACE, holdMs: 420 },
   ]),
-  stop: animSign([
-    { right: FLAT_B, left: FLAT_B, face: NEUTRAL_FACE, holdMs: 280 },
-    { right: { ...FLAT_B, wristX: 0.4 }, left: FLAT_B, face: NEUTRAL_FACE, holdMs: 400 },
+  okay: animSign([
+    { right: O_SHAPE, left: FIST, face: NEUTRAL_FACE, holdMs: 300 },
+    { right: POINT_UP, left: FIST, face: NEUTRAL_FACE, holdMs: 380 },
   ]),
-  go: animSign([
+  wrong: animSign([
+    { right: Y_SHAPE, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...Y_SHAPE, wristX: -0.2 }, left: FIST, face: NEUTRAL_FACE, holdMs: 400 },
+  ]),
+  correct: animSign([
     { right: POINT_UP, left: POINT_UP, face: NEUTRAL_FACE, holdMs: 280 },
-    { right: { ...POINT_UP, wristZ: 0.3 }, left: { ...POINT_UP, wristZ: 0.3 }, face: NEUTRAL_FACE, holdMs: 400 },
+    { right: { ...POINT_UP, wristX: 0.2 }, left: POINT_UP, face: NEUTRAL_FACE, holdMs: 400 },
   ]),
-  come: animSign([
-    { right: POINT_UP, left: POINT_UP, face: NEUTRAL_FACE, holdMs: 280 },
-    { right: { ...POINT_UP, wristZ: -0.3 }, left: { ...POINT_UP, wristZ: -0.3 }, face: NEUTRAL_FACE, holdMs: 400 },
+  true: staticSign(POINT_UP, FIST, { ...NEUTRAL_FACE, mouthSmile: 0.2 }),
+  false: animSign([
+    { right: POINT_UP, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...POINT_UP, wristZ: -0.4 }, left: FIST, face: NEUTRAL_FACE, holdMs: 400 },
   ]),
-  want: animSign([
-    { right: CURVED, left: CURVED, face: NEUTRAL_FACE, holdMs: 280 },
-    { right: FIST, left: FIST, face: NEUTRAL_FACE, holdMs: 400 },
-  ]),
-  need: animSign([
-    { right: FINGERSPELLING.X, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
-    { right: { ...FINGERSPELLING.X, wristX: 0.2 }, left: FIST, face: NEUTRAL_FACE, holdMs: 400 },
-  ]),
-  know: staticSign(FLAT_B, FIST),
-  understand: animSign([
+  sure: animSign([
     { right: POINT_UP, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
     { right: { ...POINT_UP, wristX: 0.3 }, left: FIST, face: NEUTRAL_FACE, holdMs: 400 },
   ]),
-  more: animSign([
-    { right: O_SHAPE, left: O_SHAPE, face: NEUTRAL_FACE, holdMs: 280 },
-    { right: O_SHAPE, left: O_SHAPE, face: NEUTRAL_FACE, holdMs: 400 },
+  maybe: animSign([
+    { right: OPEN, left: OPEN, face: QUESTION_FACE, holdMs: 280 },
+    { right: { ...OPEN, wristX: 0.25 }, left: { ...OPEN, wristX: -0.25 }, face: QUESTION_FACE, holdMs: 280 },
+    { right: OPEN, left: OPEN, face: QUESTION_FACE, holdMs: 280 },
   ]),
-  again: animSign([
-    { right: CURVED, left: FLAT_B, face: NEUTRAL_FACE, holdMs: 280 },
-    { right: FLAT_B, left: FLAT_B, face: NEUTRAL_FACE, holdMs: 400 },
+  probably: animSign([
+    { right: OPEN, left: OPEN, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...OPEN, wristX: 0.25 }, left: { ...OPEN, wristX: -0.25 }, face: NEUTRAL_FACE, holdMs: 400 },
   ]),
-  eat: animSign([
-    { right: O_SHAPE, left: FIST, face: { ...NEUTRAL_FACE, mouthOpen: 0.3 }, holdMs: 280 },
-    { right: { ...O_SHAPE, wristX: 0.2 }, left: FIST, face: { ...NEUTRAL_FACE, mouthOpen: 0.4 }, holdMs: 400 },
+  possible: animSign([
+    { right: FIST, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...FIST, wristX: 0.25 }, left: { ...FIST, wristX: 0.25 }, face: NEUTRAL_FACE, holdMs: 400 },
   ]),
-  drink: animSign([
-    { right: CURVED, left: FIST, face: { ...NEUTRAL_FACE, mouthOpen: 0.3 }, holdMs: 280 },
-    { right: { ...CURVED, wristX: 0.3 }, left: FIST, face: { ...NEUTRAL_FACE, mouthOpen: 0.4 }, holdMs: 400 },
+  impossible: animSign([
+    { right: FIST, left: FIST, face: { ...NEUTRAL_FACE, eyebrowRaise: -0.3 }, holdMs: 280 },
+    { right: { ...FIST, wristX: -0.25 }, left: { ...FIST, wristX: 0.25 }, face: { ...NEUTRAL_FACE, eyebrowRaise: -0.3 }, holdMs: 400 },
   ]),
+
+  // ── Questions ─────────────────────────────────────────────
+  what: animSign([
+    { right: FLAT_B, left: FIST, face: WH_QUESTION_FACE, holdMs: 280 },
+    { right: { ...FLAT_B, wristX: 0.2 }, left: FIST, face: WH_QUESTION_FACE, holdMs: 420 },
+  ]),
+  where: animSign([
+    { right: POINT_UP, left: FIST, face: WH_QUESTION_FACE, holdMs: 260 },
+    { right: { ...POINT_UP, wristZ: 0.3 }, left: FIST, face: WH_QUESTION_FACE, holdMs: 260 },
+    { right: { ...POINT_UP, wristZ: -0.3 }, left: FIST, face: WH_QUESTION_FACE, holdMs: 260 },
+  ]),
+  when: staticSign(POINT_UP, POINT_UP, WH_QUESTION_FACE),
+  who: staticSign(D_SHAPE, FIST, WH_QUESTION_FACE),
+  why: animSign([
+    { right: FLAT_B, left: FIST, face: WH_QUESTION_FACE, holdMs: 280 },
+    { right: Y_SHAPE, left: FIST, face: WH_QUESTION_FACE, holdMs: 420 },
+  ]),
+  how: animSign([
+    { right: CURVED, left: CURVED, face: WH_QUESTION_FACE, holdMs: 280 },
+    { right: FLAT_B, left: FLAT_B, face: WH_QUESTION_FACE, holdMs: 420 },
+  ]),
+  which: animSign([
+    { right: A_SHAPE, left: A_SHAPE, face: QUESTION_FACE, holdMs: 280 },
+    { right: { ...A_SHAPE, wristX: 0.25 }, left: { ...A_SHAPE, wristX: -0.25 }, face: QUESTION_FACE, holdMs: 280 },
+    { right: A_SHAPE, left: A_SHAPE, face: QUESTION_FACE, holdMs: 280 },
+  ]),
+  'how much': animSign([
+    { right: CURVED, left: CURVED, face: WH_QUESTION_FACE, holdMs: 280 },
+    { right: OPEN5,  left: OPEN5,  face: WH_QUESTION_FACE, holdMs: 420 },
+  ]),
+  'how many': animSign([
+    { right: CURVED, left: CURVED, face: WH_QUESTION_FACE, holdMs: 280 },
+    { right: OPEN5,  left: FIST,   face: WH_QUESTION_FACE, holdMs: 420 },
+  ]),
+
+  // ── Emotions & Feelings ──────────────────────────────────
+  happy: repeated(FLAT_B, FIST, { ...FLAT_B, wristX: 0.22 }, FIST, HAPPY_FACE),
+  sad: twoFrame(FLAT_B, FLAT_B, { ...FLAT_B, wristX: -0.28 }, { ...FLAT_B, wristX: -0.28 }, SAD_FACE),
+  love: staticSign(A_SHAPE, A_SHAPE, { ...HAPPY_FACE, mouthSmile: 0.95 }, 750),
+  angry: twoFrame(CLAW, FIST, FIST, FIST, ANGRY_FACE),
+  good: twoFrame(FLAT_B, FIST, { ...FLAT_B, wristX: 0.22 }, FLAT_B, HAPPY_FACE),
+  bad: twoFrame(FLAT_B, FIST, { ...FLAT_B, wristZ: -0.42 }, FIST, SAD_FACE),
+  great: twoFrame(OPEN, FIST, { ...OPEN, wristX: 0.2 }, FIST, HAPPY_FACE),
+  wonderful: animSign([
+    { right: OPEN5, left: OPEN5, face: HAPPY_FACE, holdMs: 280 },
+    { right: { ...OPEN5, wristX: 0.2 }, left: { ...OPEN5, wristX: 0.2 }, face: HAPPY_FACE, holdMs: 280 },
+    { right: OPEN5, left: OPEN5, face: HAPPY_FACE, holdMs: 280 },
+  ]),
+  beautiful: twoFrame(O_SHAPE, FIST, OPEN5, FIST, HAPPY_FACE),
+  pretty: twoFrame(O_SHAPE, FIST, OPEN5, FIST, HAPPY_FACE),
+  ugly: twoFrame(X_SHAPE, FIST, { ...X_SHAPE, wristZ: -0.3 }, FIST, DISGUSTED_FACE),
+  fun: twoFrame(U_SHAPE, U_SHAPE, { ...U_SHAPE, wristX: 0.2 }, U_SHAPE, HAPPY_FACE),
+  funny: twoFrame(U_SHAPE, U_SHAPE, { ...U_SHAPE, wristX: 0.2 }, U_SHAPE, HAPPY_FACE),
+  excited: animSign([
+    { right: OPEN5, left: OPEN5, face: HAPPY_FACE, holdMs: 240 },
+    { right: { ...OPEN5, wristX: 0.2 }, left: { ...OPEN5, wristX: -0.2 }, face: HAPPY_FACE, holdMs: 240 },
+    { right: OPEN5, left: OPEN5, face: HAPPY_FACE, holdMs: 240 },
+  ]),
+  scared: animSign([
+    { right: OPEN5, left: OPEN5, face: SURPRISED_FACE, holdMs: 280 },
+    { right: { ...OPEN5, wristX: -0.3 }, left: { ...OPEN5, wristX: -0.3 }, face: SURPRISED_FACE, holdMs: 400 },
+  ]),
+  afraid: animSign([
+    { right: OPEN5, left: OPEN5, face: SURPRISED_FACE, holdMs: 280 },
+    { right: { ...OPEN5, wristX: -0.3 }, left: { ...OPEN5, wristX: -0.3 }, face: SURPRISED_FACE, holdMs: 400 },
+  ]),
+  nervous: animSign([
+    { right: OPEN5, left: OPEN5, face: { ...NEUTRAL_FACE, eyebrowRaise: -0.2 }, holdMs: 260 },
+    { right: { ...OPEN5, wristX: 0.15 }, left: { ...OPEN5, wristX: -0.15 }, face: { ...NEUTRAL_FACE, eyebrowRaise: -0.2 }, holdMs: 260 },
+    { right: OPEN5, left: OPEN5, face: { ...NEUTRAL_FACE, eyebrowRaise: -0.2 }, holdMs: 260 },
+  ]),
+  proud: animSign([
+    { right: A_SHAPE, left: FIST, face: { ...HAPPY_FACE, eyebrowRaise: 0.1 }, holdMs: 280 },
+    { right: { ...A_SHAPE, wristX: 0.3 }, left: FIST, face: { ...HAPPY_FACE, eyebrowRaise: 0.1 }, holdMs: 400 },
+  ]),
+  surprised: animSign([
+    { right: CURVED, left: CURVED, face: SURPRISED_FACE, holdMs: 300 },
+    { right: OPEN5, left: OPEN5, face: SURPRISED_FACE, holdMs: 500 },
+  ]),
+  shocked: animSign([
+    { right: CURVED, left: CURVED, face: SURPRISED_FACE, holdMs: 300 },
+    { right: OPEN5, left: OPEN5, face: SURPRISED_FACE, holdMs: 500 },
+  ]),
+  confused: animSign([
+    { right: CLAW, left: FIST, face: WH_QUESTION_FACE, holdMs: 280 },
+    { right: { ...CLAW, wristZ: 0.3 }, left: FIST, face: WH_QUESTION_FACE, holdMs: 280 },
+    { right: CLAW, left: FIST, face: WH_QUESTION_FACE, holdMs: 280 },
+  ]),
+  frustrated: animSign([
+    { right: FLAT_B, left: FIST, face: ANGRY_FACE, holdMs: 280 },
+    { right: { ...FLAT_B, wristX: -0.25 }, left: FIST, face: ANGRY_FACE, holdMs: 280 },
+    { right: FLAT_B, left: FIST, face: ANGRY_FACE, holdMs: 280 },
+  ]),
+  tired: animSign([
+    { right: CURVED, left: CURVED, face: { ...SAD_FACE, eyeSquint: 0.5 }, holdMs: 280 },
+    { right: { ...CURVED, wristX: -0.3 }, left: { ...CURVED, wristX: -0.3 }, face: { ...SAD_FACE, eyeSquint: 0.5 }, holdMs: 400 },
+  ]),
+  bored: animSign([
+    { right: POINT_UP, left: FIST, face: { ...NEUTRAL_FACE, mouthSmile: -0.3, eyeSquint: 0.2 }, holdMs: 280 },
+    { right: { ...POINT_UP, wristZ: -0.3 }, left: FIST, face: { ...NEUTRAL_FACE, mouthSmile: -0.3, eyeSquint: 0.2 }, holdMs: 400 },
+  ]),
+  lonely: animSign([
+    { right: POINT_UP, left: FIST, face: SAD_FACE, holdMs: 280 },
+    { right: { ...POINT_UP, wristZ: 0.35 }, left: FIST, face: SAD_FACE, holdMs: 400 },
+  ]),
+  peaceful: staticSign(OPEN, OPEN, { ...HAPPY_FACE, mouthOpen: 0, mouthSmile: 0.3, eyeSquint: 0.2 }),
+  calm: staticSign(OPEN, OPEN, { ...NEUTRAL_FACE, mouthSmile: 0.2, eyeSquint: 0.1 }),
+  depressed: twoFrame(FLAT_B, FLAT_B, { ...FLAT_B, wristX: -0.35 }, { ...FLAT_B, wristX: -0.35 }, SAD_FACE),
+  hope: animSign([
+    { right: FLAT_B, left: FLAT_B, face: { ...HAPPY_FACE, eyebrowRaise: 0.2 }, holdMs: 280 },
+    { right: { ...FLAT_B, wristX: 0.2 }, left: { ...FLAT_B, wristX: 0.2 }, face: { ...HAPPY_FACE, eyebrowRaise: 0.2 }, holdMs: 400 },
+  ]),
+  worried: animSign([
+    { right: CURVED, left: CURVED, face: WH_QUESTION_FACE, holdMs: 280 },
+    { right: { ...CURVED, wristZ: 0.2 }, left: { ...CURVED, wristZ: -0.2 }, face: WH_QUESTION_FACE, holdMs: 280 },
+    { right: CURVED, left: CURVED, face: WH_QUESTION_FACE, holdMs: 280 },
+  ]),
+  embarrassed: animSign([
+    { right: OPEN5, left: OPEN5, face: { ...HAPPY_FACE, mouthSmile: -0.2 }, holdMs: 280 },
+    { right: { ...OPEN5, wristX: -0.2 }, left: { ...OPEN5, wristX: -0.2 }, face: { ...HAPPY_FACE, mouthSmile: -0.2 }, holdMs: 400 },
+  ]),
+
+  // ── Mental / Cognitive ────────────────────────────────────
+  think: animSign([
+    { right: POINT_UP, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...POINT_UP, wristZ: 0.2 }, left: FIST, face: NEUTRAL_FACE, holdMs: 400 },
+  ]),
+  know: staticSign(FLAT_B, FIST),
+  understand: twoFrame(POINT_UP, FIST, { ...POINT_UP, wristX: 0.32 }, FIST),
+  believe: animSign([
+    { right: FLAT_B, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: FIST, left: FIST, face: NEUTRAL_FACE, holdMs: 400 },
+  ]),
+  remember: animSign([
+    { right: FLAT_B, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: A_SHAPE, left: A_SHAPE, face: NEUTRAL_FACE, holdMs: 400 },
+  ]),
+  forget: animSign([
+    { right: FLAT_B, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...FLAT_B, wristZ: -0.35 }, left: FIST, face: NEUTRAL_FACE, holdMs: 400 },
+  ]),
+  imagine: animSign([
+    { right: POINT_UP, left: FIST, face: { ...NEUTRAL_FACE, eyebrowRaise: 0.3 }, holdMs: 280 },
+    { right: { ...POINT_UP, wristZ: 0.4 }, left: FIST, face: { ...NEUTRAL_FACE, eyebrowRaise: 0.3 }, holdMs: 400 },
+  ]),
+  decide: twoFrame(OPEN5, OPEN5, { ...OPEN5, wristX: 0.35 }, { ...OPEN5, wristX: 0.35 }),
+  choose: twoFrame(V_SHAPE, OPEN5, FIST, OPEN5),
+  learn: twoFrame(O_SHAPE, FLAT_B, { ...FLAT_B, wristX: 0.3 }, FLAT_B),
+  teach: twoFrame(O_SHAPE, O_SHAPE, { ...O_SHAPE, wristZ: 0.25 }, { ...O_SHAPE, wristZ: -0.25 }),
+  practice: repeated(A_SHAPE, U_SHAPE, { ...A_SHAPE, wristZ: 0.2 }, U_SHAPE),
+  study: twoFrame(OPEN5, FLAT_B, { ...OPEN5, wristX: 0.25 }, FLAT_B),
+
+  // ── Actions / Verbs ───────────────────────────────────────
+  stop: twoFrame(FLAT_B, FLAT_B, { ...FLAT_B, wristX: 0.45 }, FLAT_B),
+  go: twoFrame(POINT_UP, POINT_UP, { ...POINT_UP, wristZ: 0.32 }, { ...POINT_UP, wristZ: 0.32 }),
+  come: twoFrame(POINT_UP, POINT_UP, { ...POINT_UP, wristZ: -0.3 }, { ...POINT_UP, wristZ: -0.3 }),
+  want: twoFrame(CURVED, CURVED, FIST, FIST),
+  need: repeated(X_SHAPE, FIST, { ...X_SHAPE, wristX: 0.22 }, FIST),
+  have: twoFrame(CURVED, CURVED, FIST, FIST),
   see: staticSign(V_SHAPE, FIST),
+  look: animSign([
+    { right: V_SHAPE, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...V_SHAPE, wristZ: 0.3 }, left: FIST, face: NEUTRAL_FACE, holdMs: 420 },
+  ]),
   hear: staticSign(POINT_UP, FIST),
+  listen: animSign([
+    { right: CURVED, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...CURVED, wristX: 0.2 }, left: FIST, face: NEUTRAL_FACE, holdMs: 420 },
+  ]),
   speak: animSign([
     { right: POINT_UP, left: FIST, face: { ...NEUTRAL_FACE, mouthOpen: 0.3 }, holdMs: 280 },
-    { right: { ...POINT_UP, wristZ: 0.2 }, left: FIST, face: { ...NEUTRAL_FACE, mouthOpen: 0.3 }, holdMs: 400 },
+    { right: { ...POINT_UP, wristZ: 0.2 }, left: FIST, face: { ...NEUTRAL_FACE, mouthOpen: 0.3 }, holdMs: 420 },
   ]),
-  sign: animSign([
-    { right: POINT_UP, left: POINT_UP, face: NEUTRAL_FACE, holdMs: 280 },
-    { right: { ...POINT_UP, wristZ: 0.3 }, left: { ...POINT_UP, wristZ: -0.3 }, face: NEUTRAL_FACE, holdMs: 400 },
+  talk: animSign([
+    { right: POINT_UP, left: FIST, face: { ...NEUTRAL_FACE, mouthOpen: 0.28 }, holdMs: 260 },
+    { right: { ...POINT_UP, wristZ: 0.2 }, left: FIST, face: { ...NEUTRAL_FACE, mouthOpen: 0.28 }, holdMs: 260 },
+    { right: POINT_UP, left: FIST, face: { ...NEUTRAL_FACE, mouthOpen: 0.28 }, holdMs: 260 },
   ]),
-  sleep: animSign([
-    { right: OPEN, left: FIST, face: { ...NEUTRAL_FACE, eyeSquint: 1 }, holdMs: 280 },
-    { right: { ...OPEN, wristX: 0.3 }, left: FIST, face: { ...NEUTRAL_FACE, eyeSquint: 1 }, holdMs: 400 },
+  say: animSign([
+    { right: POINT_UP, left: FIST, face: { ...NEUTRAL_FACE, mouthOpen: 0.2 }, holdMs: 300 },
+    { right: { ...POINT_UP, wristZ: 0.25 }, left: FIST, face: { ...NEUTRAL_FACE, mouthOpen: 0.2 }, holdMs: 400 },
   ]),
-  learn: animSign([
-    { right: O_SHAPE, left: FLAT_B, face: NEUTRAL_FACE, holdMs: 280 },
-    { right: { ...FLAT_B, wristX: 0.3 }, left: FLAT_B, face: NEUTRAL_FACE, holdMs: 400 },
+  tell: twoFrame(POINT_UP, FIST, { ...POINT_UP, wristZ: 0.22 }, FIST),
+  ask: animSign([
+    { right: POINT_UP, left: FIST, face: QUESTION_FACE, holdMs: 280 },
+    { right: { ...POINT_UP, wristX: 0.2 }, left: FIST, face: QUESTION_FACE, holdMs: 400 },
   ]),
-  work: animSign([
-    { right: FINGERSPELLING.S, left: FINGERSPELLING.S, face: NEUTRAL_FACE, holdMs: 280 },
-    { right: { ...FINGERSPELLING.S, wristX: 0.2 }, left: FINGERSPELLING.S, face: NEUTRAL_FACE, holdMs: 280 },
-    { right: FINGERSPELLING.S, left: FINGERSPELLING.S, face: NEUTRAL_FACE, holdMs: 280 },
+  answer: animSign([
+    { right: POINT_UP, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...POINT_UP, wristZ: 0.28 }, left: FIST, face: NEUTRAL_FACE, holdMs: 400 },
   ]),
-  play: animSign([
-    { right: Y_SHAPE, left: Y_SHAPE, face: HAPPY_FACE, holdMs: 280 },
-    { right: { ...Y_SHAPE, wristZ: 0.3 }, left: { ...Y_SHAPE, wristZ: -0.3 }, face: HAPPY_FACE, holdMs: 280 },
-    { right: Y_SHAPE, left: Y_SHAPE, face: HAPPY_FACE, holdMs: 280 },
+  sign: twoFrame(POINT_UP, POINT_UP, { ...POINT_UP, wristZ: 0.3 }, { ...POINT_UP, wristZ: -0.3 }),
+  write: repeated(X_SHAPE, FLAT_B, { ...X_SHAPE, wristZ: 0.2 }, FLAT_B),
+  read: twoFrame(V_SHAPE, FLAT_B, { ...V_SHAPE, wristX: 0.3 }, FLAT_B),
+  watch: animSign([
+    { right: V_SHAPE, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...V_SHAPE, wristZ: 0.2 }, left: FIST, face: NEUTRAL_FACE, holdMs: 420 },
   ]),
+  eat: repeated(O_SHAPE, FIST, { ...O_SHAPE, wristX: 0.22 }, FIST, { ...NEUTRAL_FACE, mouthOpen: 0.3 }),
+  drink: repeated(CURVED, FIST, { ...CURVED, wristX: 0.32 }, FIST, { ...NEUTRAL_FACE, mouthOpen: 0.35 }),
+  cook: repeated(FLAT_B, FLAT_B, { ...FLAT_B, wristZ: 0.3 }, { ...FLAT_B, wristZ: 0.3 }),
+  sleep: twoFrame(OPEN5, FIST, { ...OPEN5, wristX: 0.35 }, FIST, { ...NEUTRAL_FACE, eyeSquint: 1 }),
+  wake: twoFrame({ ...OPEN5, wristX: 0.3 }, FIST, OPEN5, FIST, { ...NEUTRAL_FACE, eyebrowRaise: 0.4 }),
+  work: repeated(S_SHAPE, S_SHAPE, { ...S_SHAPE, wristX: 0.22 }, S_SHAPE),
+  play: repeated(Y_SHAPE, Y_SHAPE, { ...Y_SHAPE, wristZ: 0.32 }, { ...Y_SHAPE, wristZ: -0.32 }, HAPPY_FACE),
+  run: repeated(L_SHAPE, L_SHAPE, { ...L_SHAPE, wristZ: 0.3 }, { ...L_SHAPE, wristZ: 0.3 }),
+  walk: repeated(V_SHAPE, FIST, { ...V_SHAPE, wristX: 0.2 }, FIST),
+  sit: twoFrame(U_SHAPE, U_SHAPE, { ...U_SHAPE, wristX: 0.4 }, U_SHAPE),
+  stand: staticSign(V_SHAPE, FLAT_B),
+  jump: twoFrame(V_SHAPE, FLAT_B, { ...V_SHAPE, wristX: -0.3 }, FLAT_B),
+  swim: repeated(OPEN5, OPEN5, { ...OPEN5, wristZ: 0.25 }, { ...OPEN5, wristZ: -0.25 }),
+  drive: repeated(A_SHAPE, A_SHAPE, { ...A_SHAPE, wristZ: 0.3 }, { ...A_SHAPE, wristZ: -0.3 }),
+  fly: animSign([
+    { right: Y_SHAPE, left: Y_SHAPE, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...Y_SHAPE, wristX: -0.2 }, left: { ...Y_SHAPE, wristX: -0.2 }, face: NEUTRAL_FACE, holdMs: 420 },
+  ]),
+  give: twoFrame(FLAT_O, FIST, { ...FLAT_O, wristZ: 0.3 }, FIST),
+  take: twoFrame(OPEN5, FIST, FIST, FIST),
+  bring: twoFrame(FLAT_O, FLAT_O, { ...FLAT_O, wristZ: -0.3 }, { ...FLAT_O, wristZ: -0.3 }),
+  send: twoFrame(FLAT_O, FIST, { ...FLAT_O, wristZ: 0.35 }, FIST),
+  receive: twoFrame(OPEN5, OPEN5, FIST, FIST),
+  get: twoFrame(OPEN5, FIST, FIST, FIST),
+  put: twoFrame(FLAT_O, FIST, { ...FLAT_O, wristX: 0.3 }, FIST),
+  pick: twoFrame(OPEN5, FIST, F_SHAPE, FIST),
+  open: twoFrame(FLAT_B, FLAT_B, { ...FLAT_B, wristZ: 0.4 }, { ...FLAT_B, wristZ: -0.4 }),
+  close: twoFrame({ ...FLAT_B, wristZ: 0.4 }, { ...FLAT_B, wristZ: -0.4 }, FLAT_B, FLAT_B),
+  start: twoFrame(OPEN5, FIST, F_SHAPE, FIST),
+  begin: twoFrame(OPEN5, FIST, F_SHAPE, FIST),
+  finish: animSign([
+    { right: OPEN5, left: OPEN5, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...OPEN5, wristZ: -0.4 }, left: { ...OPEN5, wristZ: 0.4 }, face: NEUTRAL_FACE, holdMs: 420 },
+  ]),
+  done: animSign([
+    { right: OPEN5, left: OPEN5, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...OPEN5, wristZ: -0.4 }, left: { ...OPEN5, wristZ: 0.4 }, face: NEUTRAL_FACE, holdMs: 420 },
+  ]),
+  continue: twoFrame(Y_SHAPE, Y_SHAPE, { ...Y_SHAPE, wristZ: 0.25 }, { ...Y_SHAPE, wristZ: 0.25 }),
+  find: twoFrame(OPEN5, FIST, F_SHAPE, FIST),
+  keep: twoFrame(K_SHAPE, FIST, { ...K_SHAPE, wristX: 0.2 }, FIST),
+  use: repeated(U_SHAPE, FIST, { ...U_SHAPE, wristZ: 0.2 }, FIST),
+  make: twoFrame(S_SHAPE, S_SHAPE, { ...S_SHAPE, wristZ: 0.2 }, S_SHAPE),
+  build: repeated(S_SHAPE, S_SHAPE, { ...S_SHAPE, wristX: 0.2 }, S_SHAPE),
+  create: repeated(S_SHAPE, S_SHAPE, { ...S_SHAPE, wristX: 0.2 }, S_SHAPE),
+  try: twoFrame(A_SHAPE, A_SHAPE, { ...A_SHAPE, wristZ: 0.3 }, { ...A_SHAPE, wristZ: 0.3 }),
+  show: twoFrame(POINT_UP, FLAT_B, { ...POINT_UP, wristZ: 0.3 }, { ...FLAT_B, wristZ: 0.3 }),
+  wait: repeated(OPEN5, OPEN5, { ...OPEN5, wristZ: 0.15 }, { ...OPEN5, wristZ: -0.15 }),
+  meet: twoFrame(POINT_UP, POINT_UP, { ...POINT_UP, wristZ: 0.3 }, { ...POINT_UP, wristZ: -0.3 }),
+  leave: twoFrame(OPEN5, FIST, { ...OPEN5, wristZ: -0.3 }, FIST),
+  arrive: twoFrame(OPEN5, FLAT_B, FIST, FLAT_B),
+  travel: repeated(V_SHAPE, FIST, { ...V_SHAPE, wristZ: 0.3 }, FIST),
+  visit: repeated(V_SHAPE, FIST, { ...V_SHAPE, wristY: 0.3 }, FIST),
+  live: twoFrame(L_SHAPE, L_SHAPE, { ...L_SHAPE, wristX: 0.3 }, { ...L_SHAPE, wristX: 0.3 }),
+  die: twoFrame(FLAT_B, FLAT_B, { ...FLAT_B, wristZ: -0.5 }, { ...FLAT_B, wristZ: 0.5 }),
+  born: twoFrame(FLAT_B, FLAT_B, { ...FLAT_B, wristX: 0.3 }, FLAT_B),
+  grow: twoFrame(S_SHAPE, OPEN, { ...S_SHAPE, wristX: -0.3 }, OPEN5),
+  change: twoFrame(X_SHAPE, X_SHAPE, { ...X_SHAPE, wristZ: 0.5 }, { ...X_SHAPE, wristZ: -0.5 }),
+  move: twoFrame(FLAT_O, FLAT_O, { ...FLAT_O, wristZ: 0.3 }, { ...FLAT_O, wristZ: 0.3 }),
+  return: twoFrame(POINT_UP, FIST, { ...POINT_UP, wristZ: -0.3 }, FIST),
+  buy: twoFrame(FLAT_O, FLAT_B, { ...FLAT_O, wristX: 0.3 }, FLAT_B),
+  sell: twoFrame(FLAT_O, FLAT_B, { ...FLAT_O, wristZ: 0.3 }, FLAT_B),
+  pay: twoFrame(FLAT_B, FLAT_B, { ...FLAT_B, wristX: 0.3 }, FLAT_B),
+  cost: twoFrame(X_SHAPE, FLAT_B, { ...X_SHAPE, wristX: 0.3 }, FLAT_B),
+  win: animSign([
+    { right: S_SHAPE, left: FIST, face: HAPPY_FACE, holdMs: 280 },
+    { right: { ...S_SHAPE, wristX: -0.3 }, left: FIST, face: HAPPY_FACE, holdMs: 420 },
+  ]),
+  lose: animSign([
+    { right: V_SHAPE, left: FIST, face: SAD_FACE, holdMs: 280 },
+    { right: FIST, left: FIST, face: SAD_FACE, holdMs: 420 },
+  ]),
+  wash: repeated(A_SHAPE, A_SHAPE, { ...A_SHAPE, wristZ: 0.3 }, { ...A_SHAPE, wristZ: -0.3 }),
+  clean: twoFrame(FLAT_B, FLAT_B, { ...FLAT_B, wristZ: 0.3 }, FLAT_B),
+  shower: animSign([
+    { right: CURVED, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...CURVED, wristX: -0.2 }, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: CURVED, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+  ]),
+  call: animSign([
+    { right: Y_SHAPE, left: FIST, face: NEUTRAL_FACE, holdMs: 300 },
+    { right: { ...Y_SHAPE, wristX: 0.3 }, left: FIST, face: NEUTRAL_FACE, holdMs: 420 },
+  ]),
+  text: twoFrame(X_SHAPE, FLAT_B, { ...X_SHAPE, wristZ: 0.2 }, FLAT_B),
+  share: twoFrame(FLAT_B, FLAT_B, { ...FLAT_B, wristZ: 0.35 }, { ...FLAT_B, wristZ: 0.35 }),
+  help: twoFrame(A_SHAPE, FLAT_B, { ...A_SHAPE, wristX: 0.3 }, FLAT_B),
+  fight: repeated(A_SHAPE, A_SHAPE, { ...A_SHAPE, wristZ: 0.3 }, { ...A_SHAPE, wristZ: -0.3 }, ANGRY_FACE),
+  protect: twoFrame(S_SHAPE, S_SHAPE, { ...S_SHAPE, wristX: 0.25 }, S_SHAPE),
+  hurry: repeated(S_SHAPE, FIST, { ...S_SHAPE, wristX: 0.2 }, FIST),
+  rest: staticSign(OPEN, OPEN, { ...NEUTRAL_FACE, eyeSquint: 0.2 }),
+  relax: staticSign(OPEN, OPEN, { ...NEUTRAL_FACE, eyeSquint: 0.15 }),
 
-  // People
-  name: animSign([
-    { right: FINGERSPELLING.H, left: FINGERSPELLING.H, face: NEUTRAL_FACE, holdMs: 280 },
-    { right: { ...FINGERSPELLING.H, wristX: 0.2 }, left: { ...FINGERSPELLING.H, wristX: 0.2 }, face: NEUTRAL_FACE, holdMs: 400 },
+  // ── Modifiers / Adverbs ───────────────────────────────────
+  more: repeated(O_SHAPE, O_SHAPE, { ...O_SHAPE, wristX: 0.2 }, O_SHAPE),
+  less: twoFrame(O_SHAPE, O_SHAPE, { ...O_SHAPE, wristX: -0.2 }, O_SHAPE),
+  again: twoFrame(CURVED, FLAT_B, FLAT_B, FLAT_B),
+  also: twoFrame(Y_SHAPE, FIST, { ...Y_SHAPE, wristZ: 0.3 }, FIST),
+  too: twoFrame(Y_SHAPE, FIST, { ...Y_SHAPE, wristZ: 0.3 }, FIST),
+  very: twoFrame(V_SHAPE, V_SHAPE, { ...V_SHAPE, wristZ: 0.4 }, { ...V_SHAPE, wristZ: -0.4 }),
+  really: repeated(R_SHAPE, FIST, { ...R_SHAPE, wristX: 0.2 }, FIST),
+  not: twoFrame(A_SHAPE, FIST, { ...A_SHAPE, wristZ: -0.35 }, FIST),
+  never: animSign([
+    { right: FLAT_B, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...FLAT_B, wristZ: -0.5 }, left: FIST, face: NEUTRAL_FACE, holdMs: 420 },
   ]),
-  friend: staticSign(FINGERSPELLING.H, FINGERSPELLING.H, HAPPY_FACE),
-  family: animSign([
-    { right: FINGERSPELLING.F, left: FINGERSPELLING.F, face: NEUTRAL_FACE, holdMs: 280 },
-    { right: { ...FINGERSPELLING.F, wristZ: 0.4 }, left: { ...FINGERSPELLING.F, wristZ: -0.4 }, face: NEUTRAL_FACE, holdMs: 400 },
+  always: repeated(POINT_UP, FIST, { ...POINT_UP, wristZ: 0.3 }, FIST),
+  sometimes: animSign([
+    { right: POINT_UP, left: FIST, face: NEUTRAL_FACE, holdMs: 260 },
+    { right: { ...POINT_UP, wristZ: 0.2 }, left: FIST, face: NEUTRAL_FACE, holdMs: 260 },
+    { right: POINT_UP, left: FIST, face: NEUTRAL_FACE, holdMs: 260 },
   ]),
+  usually: repeated(U_SHAPE, FIST, { ...U_SHAPE, wristX: 0.2 }, FIST),
+  often: repeated(O_SHAPE, FIST, { ...O_SHAPE, wristX: 0.2 }, FIST),
+  still: staticSign(Y_SHAPE, Y_SHAPE),
+  yet: staticSign(Y_SHAPE, FIST),
+  already: twoFrame(Y_SHAPE, FIST, { ...Y_SHAPE, wristZ: 0.3 }, FIST),
+  soon: animSign([
+    { right: FLAT_B, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...FLAT_B, wristZ: 0.3 }, left: FIST, face: NEUTRAL_FACE, holdMs: 420 },
+  ]),
+  just: twoFrame(POINT_UP, FIST, { ...POINT_UP, wristX: 0.2 }, FIST),
+  only: staticSign(POINT_UP, FIST),
+  enough: twoFrame(S_SHAPE, FLAT_B, { ...S_SHAPE, wristZ: 0.3 }, FLAT_B),
+  almost: twoFrame(FLAT_B, FLAT_B, { ...FLAT_B, wristZ: 0.25 }, FLAT_B),
+  together: twoFrame(A_SHAPE, A_SHAPE, { ...A_SHAPE, wristY: 0.3 }, { ...A_SHAPE, wristY: -0.3 }),
+  alone: staticSign(POINT_UP, FIST, NEUTRAL_FACE, 700),
+  actually: twoFrame(A_SHAPE, FIST, { ...A_SHAPE, wristZ: 0.25 }, FIST),
+
+  // ── Connectors ────────────────────────────────────────────
+  and: twoFrame(OPEN5, FIST, O_SHAPE, FIST),
+  but: twoFrame(POINT_UP, POINT_UP, { ...POINT_UP, wristZ: 0.4 }, { ...POINT_UP, wristZ: -0.4 }),
+  or: twoFrame(L_SHAPE, L_SHAPE, { ...L_SHAPE, wristZ: 0.3 }, { ...L_SHAPE, wristZ: -0.3 }),
+  because: twoFrame(FLAT_B, FIST, { ...FLAT_B, wristX: 0.2 }, FIST),
+  so: twoFrame(S_SHAPE, FIST, { ...S_SHAPE, wristZ: 0.25 }, FIST),
+  if: twoFrame(F_SHAPE, FIST, { ...F_SHAPE, wristX: 0.2 }, FIST),
+  then: twoFrame(T_SHAPE, FIST, { ...T_SHAPE, wristZ: 0.3 }, FIST),
+  with: twoFrame(A_SHAPE, A_SHAPE, { ...A_SHAPE, wristY: 0.25 }, { ...A_SHAPE, wristY: -0.25 }),
+  without: twoFrame(A_SHAPE, A_SHAPE, { ...A_SHAPE, wristZ: 0.4 }, { ...A_SHAPE, wristZ: -0.4 }),
+  about: repeated(POINT_UP, FIST, { ...POINT_UP, wristZ: 0.3 }, FIST),
+  like: twoFrame(POINT_UP, FIST, { ...POINT_UP, wristX: 0.3 }, FIST),
+  than: twoFrame(FLAT_B, FLAT_B, { ...FLAT_B, wristX: 0.25 }, FLAT_B),
+  for: twoFrame(POINT_UP, FIST, { ...POINT_UP, wristZ: 0.3 }, FIST),
+
+  // ── Time Words ────────────────────────────────────────────
+  today: repeated(Y_SHAPE, Y_SHAPE, { ...Y_SHAPE, wristX: 0.22 }, { ...Y_SHAPE, wristX: 0.22 }),
+  tomorrow: twoFrame(A_SHAPE, FIST, { ...A_SHAPE, wristZ: 0.32 }, FIST),
+  yesterday: twoFrame(A_SHAPE, FIST, { ...A_SHAPE, wristZ: -0.32 }, FIST),
+  now: repeated(Y_SHAPE, Y_SHAPE, { ...Y_SHAPE, wristX: 0.22 }, { ...Y_SHAPE, wristX: 0.22 }),
+  later: twoFrame(L_SHAPE, FIST, { ...L_SHAPE, wristZ: 0.35 }, FIST),
+  before: twoFrame(FLAT_B, FLAT_B, { ...FLAT_B, wristZ: -0.32 }, FLAT_B),
+  after: twoFrame(FLAT_B, FLAT_B, { ...FLAT_B, wristZ: 0.32 }, FLAT_B),
+  morning: animSign([
+    { right: FLAT_B, left: CURVED, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...FLAT_B, wristX: -0.3 }, left: CURVED, face: NEUTRAL_FACE, holdMs: 420 },
+  ]),
+  afternoon: twoFrame(FLAT_B, FLAT_B, { ...FLAT_B, wristX: 0.3 }, FLAT_B),
+  evening: twoFrame(FLAT_B, CURVED, { ...FLAT_B, wristX: 0.3 }, CURVED),
+  night: twoFrame(FLAT_B, CURVED, { ...FLAT_B, wristX: -0.3 }, CURVED),
+  midnight: twoFrame(FLAT_B, FLAT_B, { ...FLAT_B, wristX: -0.4 }, FLAT_B),
+  hour: repeated(POINT_UP, FIST, { ...POINT_UP, wristZ: 0.3 }, FIST),
+  minute: repeated(POINT_UP, FLAT_B, { ...POINT_UP, wristX: 0.18 }, FLAT_B),
+  second: repeated(POINT_UP, FLAT_B, { ...POINT_UP, wristX: 0.1 }, FLAT_B),
+  day: twoFrame(D_SHAPE, FLAT_B, { ...D_SHAPE, wristX: 0.35 }, FLAT_B),
+  week: twoFrame(POINT_UP, FLAT_B, { ...POINT_UP, wristZ: 0.35 }, FLAT_B),
+  month: repeated(POINT_UP, POINT_UP, { ...POINT_UP, wristX: 0.25 }, POINT_UP),
+  year: twoFrame(S_SHAPE, S_SHAPE, { ...S_SHAPE, wristZ: 0.5 }, S_SHAPE),
+  time: repeated(POINT_UP, FIST, { ...POINT_UP, wristZ: 0.25 }, FIST),
+  early: twoFrame(S_SHAPE, CURVED, { ...S_SHAPE, wristZ: 0.3 }, CURVED),
+  late: twoFrame(FLAT_B, FIST, { ...FLAT_B, wristZ: -0.3 }, FIST),
+  long: animSign([
+    { right: POINT_UP, left: FLAT_B, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...POINT_UP, wristZ: 0.4 }, left: FLAT_B, face: NEUTRAL_FACE, holdMs: 420 },
+  ]),
+  short: animSign([
+    { right: H_SHAPE, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...H_SHAPE, wristZ: 0.2 }, left: FIST, face: NEUTRAL_FACE, holdMs: 420 },
+  ]),
+  future: twoFrame(FLAT_B, FIST, { ...FLAT_B, wristZ: 0.4 }, FIST),
+  past: twoFrame(FLAT_B, FIST, { ...FLAT_B, wristZ: -0.4 }, FIST),
+  ago: twoFrame(FLAT_B, FIST, { ...FLAT_B, wristZ: -0.35 }, FIST),
+  history: twoFrame(H_SHAPE, FIST, { ...H_SHAPE, wristZ: -0.3 }, FIST),
+
+  // ── People & Relationships ────────────────────────────────
+  name: repeated(H_SHAPE, H_SHAPE, { ...H_SHAPE, wristX: 0.22 }, H_SHAPE),
+  person: twoFrame(FLAT_B, FLAT_B, { ...FLAT_B, wristX: 0.3 }, { ...FLAT_B, wristX: 0.3 }),
+  people: repeated(FLAT_B, FLAT_B, { ...FLAT_B, wristZ: 0.25 }, { ...FLAT_B, wristZ: -0.25 }),
+  man: twoFrame(FLAT_B, FIST, { ...FLAT_B, wristX: 0.22 }, FIST),
+  woman: twoFrame(A_SHAPE, FIST, { ...FLAT_B, wristX: 0.22 }, FIST),
+  boy: twoFrame(FLAT_B, FIST, { ...FLAT_B, wristX: 0.25 }, FIST),
+  girl: twoFrame(A_SHAPE, FIST, { ...A_SHAPE, wristX: -0.25 }, FIST),
+  child: twoFrame(FLAT_B, FIST, { ...FLAT_B, wristX: -0.3 }, FIST),
+  baby: repeated(CURVED, CURVED, { ...CURVED, wristX: 0.2 }, { ...CURVED, wristX: 0.2 }, { ...NEUTRAL_FACE, mouthSmile: 0.5 }),
+  friend: staticSign(H_SHAPE, H_SHAPE, HAPPY_FACE),
+  family: twoFrame(F_SHAPE, F_SHAPE, { ...F_SHAPE, wristZ: 0.4 }, { ...F_SHAPE, wristZ: -0.4 }),
   mother: animSign([
-    { right: FINGERSPELLING.A, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
-    { right: FINGERSPELLING.M, left: FIST, face: NEUTRAL_FACE, holdMs: 400 },
+    { right: A_SHAPE, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: FINGERSPELLING.M, left: FIST, face: NEUTRAL_FACE, holdMs: 420 },
   ]),
   father: animSign([
-    { right: FINGERSPELLING.F, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
-    { right: { ...FLAT_B, wristX: 0.2 }, left: FIST, face: NEUTRAL_FACE, holdMs: 400 },
+    { right: FLAT_B, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: FINGERSPELLING.F, left: FIST, face: NEUTRAL_FACE, holdMs: 420 },
   ]),
-  baby: animSign([
-    { right: CURVED, left: CURVED, face: { ...NEUTRAL_FACE, mouthSmile: 0.5 }, holdMs: 280 },
-    { right: { ...CURVED, wristX: 0.2 }, left: { ...CURVED, wristX: 0.2 }, face: { ...NEUTRAL_FACE, mouthSmile: 0.5 }, holdMs: 400 },
+  mom: animSign([
+    { right: A_SHAPE, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: FINGERSPELLING.M, left: FIST, face: NEUTRAL_FACE, holdMs: 420 },
   ]),
+  dad: animSign([
+    { right: FLAT_B, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: FINGERSPELLING.F, left: FIST, face: NEUTRAL_FACE, holdMs: 420 },
+  ]),
+  brother: twoFrame(L_SHAPE, L_SHAPE, { ...L_SHAPE, wristX: 0.3 }, L_SHAPE),
+  sister: twoFrame(L_SHAPE, L_SHAPE, { ...L_SHAPE, wristX: -0.3 }, L_SHAPE),
+  son: animSign([
+    { right: FLAT_B, left: FLAT_B, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: CURVED, left: FLAT_B, face: NEUTRAL_FACE, holdMs: 420 },
+  ]),
+  daughter: animSign([
+    { right: A_SHAPE, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: CURVED, left: FLAT_B, face: NEUTRAL_FACE, holdMs: 420 },
+  ]),
+  husband: animSign([
+    { right: G_SHAPE, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: CURVED, left: CURVED, face: NEUTRAL_FACE, holdMs: 420 },
+  ]),
+  wife: animSign([
+    { right: A_SHAPE, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: CURVED, left: CURVED, face: NEUTRAL_FACE, holdMs: 420 },
+  ]),
+  parent: twoFrame(FLAT_B, FLAT_B, { ...FLAT_B, wristX: 0.2 }, FLAT_B),
+  grandma: animSign([
+    { right: FLAT_B, left: FIST, face: NEUTRAL_FACE, holdMs: 260 },
+    { right: { ...FLAT_B, wristZ: 0.3 }, left: FIST, face: NEUTRAL_FACE, holdMs: 260 },
+    { right: FLAT_B, left: FIST, face: NEUTRAL_FACE, holdMs: 260 },
+  ]),
+  grandpa: animSign([
+    { right: FLAT_B, left: FIST, face: NEUTRAL_FACE, holdMs: 260 },
+    { right: { ...FLAT_B, wristZ: 0.3 }, left: FIST, face: NEUTRAL_FACE, holdMs: 260 },
+    { right: FLAT_B, left: FIST, face: NEUTRAL_FACE, holdMs: 260 },
+  ]),
+  teacher: twoFrame(O_SHAPE, O_SHAPE, { ...O_SHAPE, wristZ: 0.25 }, { ...O_SHAPE, wristZ: -0.25 }),
+  student: twoFrame(O_SHAPE, FLAT_B, { ...FLAT_B, wristX: 0.3 }, FLAT_B),
+  doctor: repeated(D_SHAPE, FIST, { ...D_SHAPE, wristX: 0.2 }, FIST),
+  nurse: animSign([
+    { right: N_SHAPE, left: FLAT_B, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...N_SHAPE, wristX: 0.2 }, left: FLAT_B, face: NEUTRAL_FACE, holdMs: 420 },
+  ]),
+  police: animSign([
+    { right: CURVED, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...CURVED, wristX: 0.2 }, left: FIST, face: NEUTRAL_FACE, holdMs: 420 },
+  ]),
+  boss: twoFrame(CURVED, FIST, { ...CURVED, wristX: 0.2 }, FIST),
+  neighbor: twoFrame(FLAT_B, FLAT_B, { ...FLAT_B, wristZ: 0.3 }, FLAT_B),
+  stranger: twoFrame(S_SHAPE, FIST, { ...S_SHAPE, wristZ: 0.3 }, FIST),
 
-  // Objects / Places
-  water: animSign([
-    { right: FINGERSPELLING.W, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
-    { right: { ...FINGERSPELLING.W, wristX: 0.2 }, left: FIST, face: NEUTRAL_FACE, holdMs: 400 },
+  // ── Body Parts ────────────────────────────────────────────
+  head: twoFrame(CURVED, FIST, { ...CURVED, wristX: 0.25 }, FIST),
+  face: repeated(POINT_UP, FIST, { ...POINT_UP, wristZ: 0.3 }, FIST),
+  hair: repeated(G_SHAPE, FIST, { ...G_SHAPE, wristX: -0.2 }, FIST),
+  eye: twoFrame(V_SHAPE, FIST, { ...V_SHAPE, wristZ: 0.25 }, FIST),
+  eyes: twoFrame(V_SHAPE, FIST, { ...V_SHAPE, wristZ: 0.25 }, FIST),
+  ear: twoFrame(POINT_UP, FIST, { ...POINT_UP, wristZ: 0.2 }, FIST),
+  nose: twoFrame(D_SHAPE, FIST, { ...D_SHAPE, wristZ: 0.2 }, FIST),
+  mouth: repeated(POINT_UP, FIST, { ...POINT_UP, wristZ: 0.3 }, FIST),
+  tooth: twoFrame(POINT_UP, FIST, { ...POINT_UP, wristX: 0.2 }, FIST),
+  tongue: twoFrame(POINT_UP, FIST, { ...POINT_UP, wristX: 0.25 }, FIST),
+  neck: twoFrame(V_SHAPE, FIST, { ...V_SHAPE, wristZ: 0.3 }, FIST),
+  shoulder: twoFrame(CURVED, FIST, { ...CURVED, wristX: 0.3 }, FIST),
+  arm: twoFrame(FLAT_B, FIST, { ...FLAT_B, wristZ: 0.3 }, FIST),
+  hand: twoFrame(FLAT_B, FLAT_B, { ...FLAT_B, wristX: 0.25 }, FLAT_B),
+  finger: twoFrame(G_SHAPE, FIST, { ...G_SHAPE, wristZ: 0.25 }, FIST),
+  chest: staticSign(FLAT_B, FIST),
+  heart: repeated(CURVED, FIST, { ...CURVED, wristX: 0.2 }, FIST),
+  stomach: twoFrame(CURVED, FIST, { ...CURVED, wristZ: 0.3 }, FIST),
+  back: twoFrame(FLAT_B, FIST, { ...FLAT_B, wristZ: -0.3 }, FIST),
+  leg: twoFrame(POINT_UP, FIST, { ...POINT_UP, wristX: 0.3 }, FIST),
+  knee: repeated(POINT_UP, FIST, { ...POINT_UP, wristX: 0.25 }, FIST),
+  foot: twoFrame(CURVED, FIST, { ...CURVED, wristX: 0.35 }, FIST),
+  brain: repeated(POINT_UP, FIST, { ...POINT_UP, wristZ: 0.2 }, FIST),
+  blood: twoFrame(CURVED, FIST, { ...CURVED, wristX: -0.25 }, FIST),
+
+  // ── Food & Drink ──────────────────────────────────────────
+  food: repeated(O_SHAPE, FIST, { ...O_SHAPE, wristX: 0.22 }, FIST, { ...NEUTRAL_FACE, mouthOpen: 0.2 }),
+  water: repeated(W_SHAPE, FIST, { ...W_SHAPE, wristX: 0.22 }, FIST),
+  hungry: twoFrame(CURVED, FIST, { ...CURVED, wristX: 0.35 }, FIST),
+  thirsty: twoFrame(POINT_UP, FIST, { ...POINT_UP, wristX: 0.4 }, FIST),
+  apple: repeated(A_SHAPE, FIST, { ...A_SHAPE, wristZ: 0.25 }, FIST),
+  orange: repeated(CURVED, FIST, FIST, FIST),
+  banana: animSign([
+    { right: G_SHAPE, left: POINT_UP, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...G_SHAPE, wristX: 0.3 }, left: POINT_UP, face: NEUTRAL_FACE, holdMs: 420 },
   ]),
-  food: animSign([
-    { right: O_SHAPE, left: FIST, face: { ...NEUTRAL_FACE, mouthOpen: 0.2 }, holdMs: 280 },
-    { right: { ...O_SHAPE, wristX: 0.2 }, left: FIST, face: { ...NEUTRAL_FACE, mouthOpen: 0.3 }, holdMs: 400 },
+  bread: repeated(FLAT_B, CURVED, { ...FLAT_B, wristZ: 0.3 }, CURVED),
+  milk: repeated(CURVED, FIST, FIST, FIST),
+  coffee: repeated(S_SHAPE, S_SHAPE, { ...S_SHAPE, wristZ: 0.3 }, S_SHAPE),
+  tea: animSign([
+    { right: F_SHAPE, left: O_SHAPE, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...F_SHAPE, wristZ: 0.3 }, left: O_SHAPE, face: NEUTRAL_FACE, holdMs: 420 },
   ]),
+  juice: repeated(A_SHAPE, FIST, { ...A_SHAPE, wristX: 0.25 }, FIST),
+  rice: repeated(R_SHAPE, FIST, { ...R_SHAPE, wristX: 0.22 }, FIST),
+  chicken: repeated(G_SHAPE, FLAT_B, { ...G_SHAPE, wristX: 0.2 }, FLAT_B),
+  fish: animSign([
+    { right: FLAT_B, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...FLAT_B, wristZ: 0.2 }, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...FLAT_B, wristZ: -0.2 }, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+  ]),
+  egg: twoFrame(F_SHAPE, F_SHAPE, { ...F_SHAPE, wristZ: 0.4 }, { ...F_SHAPE, wristZ: -0.4 }),
+  cheese: twoFrame(FLAT_B, FLAT_B, { ...FLAT_B, wristZ: 0.3 }, { ...FLAT_B, wristZ: -0.3 }),
+  pizza: twoFrame(FLAT_B, FIST, { ...FLAT_B, wristX: 0.3 }, FIST),
+  cake: twoFrame(CURVED, FLAT_B, { ...CURVED, wristX: 0.3 }, FLAT_B),
+  cookie: repeated(CURVED, FLAT_B, { ...CURVED, wristZ: 0.3 }, FLAT_B),
+  chocolate: repeated(C_SHAPE, FIST, { ...C_SHAPE, wristZ: 0.25 }, FIST),
+  sugar: repeated(U_SHAPE, FIST, { ...U_SHAPE, wristZ: 0.2 }, FIST),
+  salt: twoFrame(V_SHAPE, FIST, { ...V_SHAPE, wristX: 0.3 }, FIST),
+  breakfast: animSign([
+    { right: FLAT_B, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: O_SHAPE, left: FIST, face: { ...NEUTRAL_FACE, mouthOpen: 0.25 }, holdMs: 420 },
+  ]),
+  lunch: animSign([
+    { right: L_SHAPE, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: O_SHAPE, left: FIST, face: { ...NEUTRAL_FACE, mouthOpen: 0.25 }, holdMs: 420 },
+  ]),
+  dinner: animSign([
+    { right: D_SHAPE, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: O_SHAPE, left: FIST, face: { ...NEUTRAL_FACE, mouthOpen: 0.25 }, holdMs: 420 },
+  ]),
+  snack: animSign([
+    { right: S_SHAPE, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: O_SHAPE, left: FIST, face: { ...NEUTRAL_FACE, mouthOpen: 0.22 }, holdMs: 420 },
+  ]),
+  restaurant: repeated(R_SHAPE, FIST, { ...R_SHAPE, wristZ: 0.25 }, FIST),
+
+  // ── Descriptors / Adjectives ──────────────────────────────
+  big: twoFrame(L_SHAPE, L_SHAPE, { ...L_SHAPE, wristY: -0.4 }, { ...L_SHAPE, wristY: 0.4 }),
+  small: twoFrame(FLAT_B, FLAT_B, { ...FLAT_B, wristY: 0.3 }, { ...FLAT_B, wristY: -0.3 }),
+  large: twoFrame(L_SHAPE, L_SHAPE, { ...L_SHAPE, wristY: -0.45 }, { ...L_SHAPE, wristY: 0.45 }),
+  little: twoFrame(G_SHAPE, G_SHAPE, { ...G_SHAPE, wristY: 0.3 }, { ...G_SHAPE, wristY: -0.3 }),
+  tall: twoFrame(FLAT_B, FIST, { ...FLAT_B, wristX: -0.4 }, FIST),
+  heavy: twoFrame(OPEN5, OPEN5, { ...OPEN5, wristX: 0.4 }, { ...OPEN5, wristX: 0.4 }),
+  light: twoFrame(OPEN5, OPEN5, { ...OPEN5, wristX: -0.3 }, { ...OPEN5, wristX: -0.3 }),
+  hot: twoFrame(CURVED, FIST, { ...CURVED, wristZ: -0.35 }, FIST),
+  cold: repeated(S_SHAPE, S_SHAPE, { ...S_SHAPE, wristZ: 0.2 }, { ...S_SHAPE, wristZ: -0.2 }),
+  warm: twoFrame(CURVED, FIST, { ...CURVED, wristX: 0.25 }, FIST),
+  cool: twoFrame(OPEN5, FIST, { ...OPEN5, wristX: -0.2 }, FIST),
+  fast: twoFrame(L_SHAPE, L_SHAPE, FIST, FIST),
+  slow: twoFrame(FLAT_B, FLAT_B, { ...FLAT_B, wristX: 0.2 }, FLAT_B),
+  easy: twoFrame(CURVED, FLAT_B, { ...CURVED, wristX: 0.25 }, FLAT_B),
+  hard: twoFrame(S_SHAPE, S_SHAPE, { ...S_SHAPE, wristX: 0.25 }, S_SHAPE),
+  difficult: twoFrame(S_SHAPE, S_SHAPE, { ...S_SHAPE, wristX: 0.25 }, S_SHAPE),
+  same: twoFrame(Y_SHAPE, FIST, { ...Y_SHAPE, wristZ: 0.3 }, FIST),
+  different: twoFrame(POINT_UP, POINT_UP, { ...POINT_UP, wristZ: -0.4 }, { ...POINT_UP, wristZ: 0.4 }),
+  new: twoFrame(CURVED, FLAT_B, { ...CURVED, wristX: 0.25 }, FLAT_B),
+  old: twoFrame(CURVED, FIST, FIST, FIST),
+  young: twoFrame(CURVED, FIST, { ...CURVED, wristX: 0.25 }, FIST),
+  dirty: repeated(CURVED, FIST, { ...CURVED, wristZ: 0.25 }, FIST),
+  loud: twoFrame(OPEN5, FIST, { ...OPEN5, wristZ: 0.3 }, FIST),
+  quiet: twoFrame(OPEN5, FIST, { ...OPEN5, wristZ: -0.3 }, FIST),
+  safe: twoFrame(S_SHAPE, S_SHAPE, { ...S_SHAPE, wristX: 0.3 }, S_SHAPE),
+  dangerous: repeated(D_SHAPE, S_SHAPE, { ...D_SHAPE, wristZ: 0.25 }, S_SHAPE, INTENSE_FACE),
+  important: twoFrame(F_SHAPE, FIST, { ...F_SHAPE, wristX: 0.3 }, FIST),
+  special: twoFrame(A_SHAPE, FIST, { ...A_SHAPE, wristX: 0.3 }, FIST),
+  normal: twoFrame(FLAT_B, FLAT_B, { ...FLAT_B, wristX: 0.25 }, FLAT_B),
+  ready: repeated(R_SHAPE, FIST, { ...R_SHAPE, wristZ: 0.25 }, FIST),
+  busy: repeated(S_SHAPE, S_SHAPE, { ...S_SHAPE, wristX: 0.2 }, S_SHAPE),
+  free: twoFrame(F_SHAPE, F_SHAPE, { ...F_SHAPE, wristZ: 0.4 }, { ...F_SHAPE, wristZ: -0.4 }),
+  rich: twoFrame(FLAT_B, O_SHAPE, { ...FLAT_B, wristX: 0.3 }, O_SHAPE),
+  poor: twoFrame(CURVED, FIST, { ...CURVED, wristX: -0.25 }, FIST),
+  expensive: twoFrame(FLAT_B, O_SHAPE, { ...FLAT_B, wristX: 0.3 }, OPEN5),
+  cheap: twoFrame(CURVED, FLAT_B, { ...CURVED, wristX: 0.3 }, FLAT_B),
+  healthy: twoFrame(H_SHAPE, H_SHAPE, { ...H_SHAPE, wristX: 0.25 }, H_SHAPE),
+  alive: twoFrame(L_SHAPE, L_SHAPE, { ...L_SHAPE, wristX: 0.3 }, { ...L_SHAPE, wristX: 0.3 }),
+  dead: twoFrame(FLAT_B, FLAT_B, { ...FLAT_B, wristZ: -0.5 }, { ...FLAT_B, wristZ: 0.5 }),
+  broken: twoFrame(S_SHAPE, S_SHAPE, { ...S_SHAPE, wristZ: 0.5 }, { ...S_SHAPE, wristZ: -0.5 }, SAD_FACE),
+  full: twoFrame(CURVED, FIST, { ...CURVED, wristX: 0.35 }, FIST),
+  empty: twoFrame(OPEN5, FIST, { ...OPEN5, wristX: -0.3 }, FIST),
+  closed: twoFrame({ ...FLAT_B, wristZ: 0.4 }, { ...FLAT_B, wristZ: -0.4 }, FLAT_B, FLAT_B),
+  real: twoFrame(POINT_UP, FIST, { ...POINT_UP, wristX: 0.25 }, FIST),
+  fake: twoFrame(POINT_UP, FIST, { ...POINT_UP, wristZ: -0.35 }, FIST),
+  perfect: twoFrame(F_SHAPE, F_SHAPE, { ...F_SHAPE, wristZ: 0.3 }, { ...F_SHAPE, wristZ: 0.3 }),
+
+  // ── Colors ────────────────────────────────────────────────
+  red: repeated(POINT_UP, FIST, { ...POINT_UP, wristX: 0.22 }, FIST),
+  blue: repeated(FINGERSPELLING.B, FIST, { ...FINGERSPELLING.B, wristZ: 0.3 }, FIST),
+  green: repeated(FINGERSPELLING.G, FIST, { ...FINGERSPELLING.G, wristZ: 0.2 }, FIST),
+  yellow: repeated(Y_SHAPE, FIST, { ...Y_SHAPE, wristZ: 0.28 }, FIST),
+  white: twoFrame(CURVED, FIST, O_SHAPE, FIST),
+  black: twoFrame(POINT_UP, FIST, { ...POINT_UP, wristZ: -0.4 }, FIST),
+  purple: repeated(FINGERSPELLING.P, FIST, { ...FINGERSPELLING.P, wristZ: 0.25 }, FIST),
+  pink: repeated(FINGERSPELLING.P, FIST, { ...FINGERSPELLING.P, wristX: 0.2 }, FIST),
+  brown: repeated(FINGERSPELLING.B, FIST, { ...FINGERSPELLING.B, wristX: 0.25 }, FIST),
+  gray: repeated(OPEN5, OPEN5, { ...OPEN5, wristZ: 0.2 }, { ...OPEN5, wristZ: -0.2 }),
+  color: repeated(CURVED, FIST, { ...CURVED, wristZ: 0.25 }, FIST),
+
+  // ── Numbers ───────────────────────────────────────────────
+  zero: staticSign(O_SHAPE, FIST),
+  one:   staticSign({ ...POINT_UP, thumb: { flex: 0.72, abd: 0 } }, FIST),
+  two:   staticSign(V_SHAPE, FIST),
+  three: staticSign({ thumb: { flex: 0.1, abd: 0.7 }, index: { curl: 0, spread: -0.2 }, middle: { curl: 0, spread: 0.2 }, ring: { curl: 0.9, spread: 0 }, pinky: { curl: 0.9, spread: 0 } }, FIST),
+  four:  staticSign({ thumb: { flex: 0.8, abd: 0 }, index: { curl: 0, spread: -0.28 }, middle: { curl: 0, spread: -0.08 }, ring: { curl: 0, spread: 0.08 }, pinky: { curl: 0, spread: 0.28 } }, FIST),
+  five:  staticSign(OPEN5, FIST),
+  six:   staticSign({ thumb: { flex: 0.1, abd: 0.6 }, index: { curl: 0.9, spread: 0 }, middle: { curl: 0.9, spread: 0 }, ring: { curl: 0.9, spread: 0 }, pinky: { curl: 0, spread: 0 } }, FIST),
+  seven: staticSign({ thumb: { flex: 0.1, abd: 0.6 }, index: { curl: 0.9, spread: 0 }, middle: { curl: 0.9, spread: 0 }, ring: { curl: 0, spread: 0 }, pinky: { curl: 0.9, spread: 0 } }, FIST),
+  eight: staticSign({ thumb: { flex: 0.2, abd: 0.5 }, index: { curl: 0.9, spread: 0 }, middle: { curl: 0, spread: 0 }, ring: { curl: 0.9, spread: 0 }, pinky: { curl: 0.9, spread: 0 } }, FIST),
+  nine:  staticSign({ thumb: { flex: 0.3, abd: 0.5 }, index: { curl: 0, spread: 0 }, middle: { curl: 0.9, spread: 0 }, ring: { curl: 0.9, spread: 0 }, pinky: { curl: 0.9, spread: 0 } }, FIST),
+  ten:   animSign([
+    { right: A_SHAPE, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...A_SHAPE, wristZ: 0.3 }, left: FIST, face: NEUTRAL_FACE, holdMs: 420 },
+  ]),
+  eleven: repeated(L_SHAPE, FIST, { ...L_SHAPE, wristX: 0.2 }, FIST),
+  twelve: repeated(V_SHAPE, FIST, { ...V_SHAPE, wristX: 0.2 }, FIST),
+  thirteen: animSign([
+    { right: { ...POINT_UP, thumb: { flex: 0.72, abd: 0 } }, left: FIST, face: NEUTRAL_FACE, holdMs: 240 },
+    { right: T_SHAPE, left: FIST, face: NEUTRAL_FACE, holdMs: 240 },
+    { right: { thumb: { flex: 0.1, abd: 0.7 }, index: { curl: 0, spread: -0.2 }, middle: { curl: 0, spread: 0.2 }, ring: { curl: 0.9, spread: 0 }, pinky: { curl: 0.9, spread: 0 } }, left: FIST, face: NEUTRAL_FACE, holdMs: 300 },
+  ]),
+  twenty: animSign([
+    { right: V_SHAPE, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: O_SHAPE, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+  ]),
+  hundred: twoFrame(C_SHAPE, FIST, { ...C_SHAPE, wristX: 0.3 }, FIST),
+  thousand: twoFrame(FLAT_B, S_SHAPE, { ...FLAT_B, wristX: 0.3 }, S_SHAPE),
+  million: repeated(M_SHAPE, FIST, { ...M_SHAPE, wristX: 0.2 }, FIST),
+
+  // ── Places & Locations ────────────────────────────────────
+  here: repeated(POINT_UP, FIST, { ...POINT_UP, wristZ: 0.2 }, FIST),
+  there: twoFrame(POINT_UP, FIST, { ...POINT_UP, wristZ: 0.35 }, FIST),
+  home: twoFrame(O_SHAPE, FIST, FLAT_B, FIST),
   house: animSign([
     { right: FLAT_B, left: FLAT_B, face: NEUTRAL_FACE, holdMs: 280 },
     { right: { ...FLAT_B, wristZ: 0.3 }, left: { ...FLAT_B, wristZ: -0.3 }, face: NEUTRAL_FACE, holdMs: 280 },
     { right: FLAT_B, left: FLAT_B, face: NEUTRAL_FACE, holdMs: 280 },
   ]),
-  school: animSign([
-    { right: FLAT_B, left: FLAT_B, face: NEUTRAL_FACE, holdMs: 280 },
-    { right: { ...FLAT_B, wristX: 0.3 }, left: FLAT_B, face: NEUTRAL_FACE, holdMs: 400 },
+  room: twoFrame(R_SHAPE, R_SHAPE, { ...R_SHAPE, wristZ: 0.4 }, { ...R_SHAPE, wristZ: -0.4 }),
+  school: twoFrame(FLAT_B, FLAT_B, { ...FLAT_B, wristX: 0.32 }, FLAT_B),
+  office: repeated(O_SHAPE, FIST, { ...O_SHAPE, wristZ: 0.25 }, FIST),
+  store: repeated(S_SHAPE, FIST, { ...S_SHAPE, wristZ: 0.25 }, FIST),
+  shop: repeated(S_SHAPE, FIST, { ...S_SHAPE, wristZ: 0.25 }, FIST),
+  market: repeated(M_SHAPE, FIST, { ...M_SHAPE, wristZ: 0.25 }, FIST),
+  hospital: animSign([
+    { right: H_SHAPE, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...H_SHAPE, wristX: 0.25 }, left: FIST, face: NEUTRAL_FACE, holdMs: 420 },
   ]),
-  book: animSign([
-    { right: FLAT_B, left: FLAT_B, face: NEUTRAL_FACE, holdMs: 280 },
-    { right: { ...FLAT_B, wristZ: 0.4 }, left: { ...FLAT_B, wristZ: -0.4 }, face: NEUTRAL_FACE, holdMs: 400 },
+  park: animSign([
+    { right: FLAT_B, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...FLAT_B, wristX: 0.25 }, left: FIST, face: NEUTRAL_FACE, holdMs: 420 },
+  ]),
+  street: repeated(FLAT_B, FLAT_B, { ...FLAT_B, wristZ: 0.3 }, { ...FLAT_B, wristZ: 0.3 }),
+  road: repeated(R_SHAPE, FIST, { ...R_SHAPE, wristZ: 0.3 }, FIST),
+  city: repeated(S_SHAPE, S_SHAPE, { ...S_SHAPE, wristZ: 0.25 }, S_SHAPE),
+  town: twoFrame(T_SHAPE, FIST, { ...T_SHAPE, wristZ: 0.3 }, FIST),
+  country: twoFrame(CURVED, FIST, { ...CURVED, wristZ: 0.3 }, FIST),
+  world: twoFrame(W_SHAPE, W_SHAPE, { ...W_SHAPE, wristZ: 0.5 }, { ...W_SHAPE, wristZ: -0.5 }),
+  bathroom: animSign([
+    { right: T_SHAPE, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...T_SHAPE, wristZ: 0.3 }, left: FIST, face: NEUTRAL_FACE, holdMs: 420 },
+  ]),
+  kitchen: twoFrame(K_SHAPE, FLAT_B, { ...K_SHAPE, wristZ: 0.3 }, FLAT_B),
+  bedroom: animSign([
+    { right: FLAT_B, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: R_SHAPE, left: FIST, face: NEUTRAL_FACE, holdMs: 420 },
+  ]),
+  library: repeated(L_SHAPE, FIST, { ...L_SHAPE, wristZ: 0.3 }, FIST),
+  church: twoFrame(CURVED, CURVED, { ...CURVED, wristZ: 0.35 }, { ...CURVED, wristZ: -0.35 }),
+  outside: twoFrame(O_SHAPE, FIST, { ...O_SHAPE, wristZ: 0.35 }, FIST),
+  inside: twoFrame(FLAT_O, FIST, { ...FLAT_O, wristX: 0.25 }, FIST),
+
+  // ── Spatial ───────────────────────────────────────────────
+  up:    twoFrame(POINT_UP, FIST, { ...POINT_UP, wristX: -0.35 }, FIST),
+  down:  twoFrame(POINT_UP, FIST, { ...POINT_UP, wristX:  0.35 }, FIST),
+  left:  twoFrame(L_SHAPE,  FIST, { ...L_SHAPE,  wristY: -0.4 },  FIST),
+  right: twoFrame(L_SHAPE,  FIST, { ...L_SHAPE,  wristY:  0.4 },  FIST),
+  near:  twoFrame(FLAT_B, FIST, { ...FLAT_B, wristZ: 0.3 }, FIST),
+  far:   twoFrame(FLAT_B, FIST, { ...FLAT_B, wristZ: -0.3 }, FIST),
+  next:  twoFrame(FLAT_B, FIST, { ...FLAT_B, wristY: 0.3 }, FIST),
+  behind: twoFrame(A_SHAPE, A_SHAPE, { ...A_SHAPE, wristZ: -0.3 }, A_SHAPE),
+  front: twoFrame(FLAT_B, FIST, { ...FLAT_B, wristZ: 0.35 }, FIST),
+  between: twoFrame(FLAT_B, V_SHAPE, { ...FLAT_B, wristX: 0.3 }, V_SHAPE),
+  above:  twoFrame(FLAT_B, FLAT_B, { ...FLAT_B, wristX: -0.3 }, FLAT_B),
+  below:  twoFrame(FLAT_B, FLAT_B, { ...FLAT_B, wristX:  0.3 }, FLAT_B),
+  around: repeated(POINT_UP, FIST, { ...POINT_UP, wristY: 0.4 }, FIST),
+  across: twoFrame(FLAT_B, FLAT_B, { ...FLAT_B, wristZ: 0.35 }, FLAT_B),
+
+  // ── Nature & Weather ──────────────────────────────────────
+  sun: animSign([
+    { right: C_SHAPE, left: FIST, face: HAPPY_FACE, holdMs: 280 },
+    { right: OPEN5,   left: FIST, face: HAPPY_FACE, holdMs: 420 },
+  ]),
+  moon: twoFrame(C_SHAPE, FIST, { ...C_SHAPE, wristX: -0.3 }, FIST),
+  star: repeated(POINT_UP, POINT_UP, { ...POINT_UP, wristZ: 0.2 }, { ...POINT_UP, wristZ: -0.2 }),
+  sky: twoFrame(FLAT_B, FIST, { ...FLAT_B, wristY: 0.5 }, FIST),
+  cloud: twoFrame(CURVED, CURVED, { ...CURVED, wristY: 0.3 }, { ...CURVED, wristY: -0.3 }),
+  rain: animSign([
+    { right: OPEN5, left: OPEN5, face: NEUTRAL_FACE, holdMs: 240 },
+    { right: { ...OPEN5, wristX: 0.3 }, left: { ...OPEN5, wristX: 0.3 }, face: NEUTRAL_FACE, holdMs: 240 },
+    { right: OPEN5, left: OPEN5, face: NEUTRAL_FACE, holdMs: 240 },
+  ]),
+  snow: animSign([
+    { right: OPEN5, left: OPEN5, face: NEUTRAL_FACE, holdMs: 240 },
+    { right: { ...OPEN5, wristX: 0.28, wristZ: 0.15 }, left: { ...OPEN5, wristX: 0.28, wristZ: -0.15 }, face: NEUTRAL_FACE, holdMs: 240 },
+    { right: OPEN5, left: OPEN5, face: NEUTRAL_FACE, holdMs: 240 },
+  ]),
+  wind: repeated(OPEN5, OPEN5, { ...OPEN5, wristY: 0.3 }, { ...OPEN5, wristY: -0.3 }),
+  storm: animSign([
+    { right: S_SHAPE, left: S_SHAPE, face: INTENSE_FACE, holdMs: 280 },
+    { right: { ...S_SHAPE, wristZ: 0.4 }, left: { ...S_SHAPE, wristZ: -0.4 }, face: INTENSE_FACE, holdMs: 280 },
+    { right: S_SHAPE, left: S_SHAPE, face: INTENSE_FACE, holdMs: 280 },
+  ]),
+  weather: twoFrame(W_SHAPE, FIST, { ...W_SHAPE, wristZ: 0.3 }, FIST),
+  earth: twoFrame(E_SHAPE, S_SHAPE, { ...E_SHAPE, wristZ: 0.5 }, S_SHAPE),
+  ocean: twoFrame(O_SHAPE, OPEN5, { ...O_SHAPE, wristX: 0.25 }, OPEN5),
+  river: twoFrame(R_SHAPE, R_SHAPE, { ...R_SHAPE, wristZ: 0.3 }, { ...R_SHAPE, wristZ: 0.3 }),
+  tree: twoFrame(FLAT_B, FLAT_B, { ...FLAT_B, wristZ: 0.3 }, FLAT_B),
+  flower: repeated(O_SHAPE, FIST, { ...O_SHAPE, wristZ: 0.2 }, FIST),
+  plant: twoFrame(FLAT_B, S_SHAPE, { ...FLAT_B, wristX: -0.3 }, S_SHAPE),
+  mountain: animSign([
+    { right: S_SHAPE, left: S_SHAPE, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...S_SHAPE, wristX: -0.4 }, left: { ...S_SHAPE, wristX: -0.4 }, face: NEUTRAL_FACE, holdMs: 420 },
+  ]),
+  fire: animSign([
+    { right: OPEN5, left: OPEN5, face: NEUTRAL_FACE, holdMs: 240 },
+    { right: { ...OPEN5, wristX: -0.2 }, left: { ...OPEN5, wristX: -0.2 }, face: NEUTRAL_FACE, holdMs: 240 },
+    { right: OPEN5, left: OPEN5, face: NEUTRAL_FACE, holdMs: 240 },
   ]),
 
-  // Adjectives
-  big: animSign([
-    { right: FINGERSPELLING.L, left: FINGERSPELLING.L, face: NEUTRAL_FACE, holdMs: 280 },
-    { right: { ...FINGERSPELLING.L, wristY: -0.4 }, left: { ...FINGERSPELLING.L, wristY: 0.4 }, face: NEUTRAL_FACE, holdMs: 400 },
+  // ── Animals ───────────────────────────────────────────────
+  dog: twoFrame(FLAT_B, FIST, { ...FLAT_B, wristX: 0.25 }, FIST),
+  cat: twoFrame(F_SHAPE, FIST, { ...F_SHAPE, wristZ: 0.3 }, FIST),
+  bird: repeated(G_SHAPE, FIST, { ...G_SHAPE, wristX: 0.2 }, FIST),
+  horse: animSign([
+    { right: H_SHAPE, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...H_SHAPE, wristX: 0.2 }, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: H_SHAPE, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
   ]),
-  small: animSign([
-    { right: FLAT_B, left: FLAT_B, face: NEUTRAL_FACE, holdMs: 280 },
-    { right: { ...FLAT_B, wristY: 0.3 }, left: { ...FLAT_B, wristY: -0.3 }, face: NEUTRAL_FACE, holdMs: 400 },
+  cow: twoFrame(Y_SHAPE, FIST, { ...Y_SHAPE, wristZ: 0.3 }, FIST),
+  bear: twoFrame(CLAW, CLAW, { ...CLAW, wristX: 0.3 }, { ...CLAW, wristX: 0.3 }),
+  rabbit: repeated(U_SHAPE, FIST, { ...U_SHAPE, wristX: 0.25 }, FIST),
+  lion: twoFrame(CLAW, FIST, { ...CLAW, wristZ: 0.4 }, FIST),
+  elephant: twoFrame(S_SHAPE, FIST, { ...S_SHAPE, wristX: 0.4 }, FIST),
+
+  // ── Technology ────────────────────────────────────────────
+  phone: staticSign(Y_SHAPE, FIST, NEUTRAL_FACE, 700),
+  computer: repeated(C_SHAPE, FIST, { ...C_SHAPE, wristZ: 0.3 }, FIST),
+  internet: repeated(I_SHAPE, I_SHAPE, { ...I_SHAPE, wristZ: 0.3 }, { ...I_SHAPE, wristZ: -0.3 }),
+  app: twoFrame(A_SHAPE, FIST, { ...A_SHAPE, wristZ: 0.3 }, FIST),
+  screen: twoFrame(FLAT_B, FLAT_B, { ...FLAT_B, wristY: 0.4 }, { ...FLAT_B, wristY: -0.4 }),
+  camera: animSign([
+    { right: L_SHAPE, left: CURVED, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...L_SHAPE, wristX: 0.3 }, left: CURVED, face: NEUTRAL_FACE, holdMs: 420 },
   ]),
-  same: animSign([
+  car: repeated(A_SHAPE, A_SHAPE, { ...A_SHAPE, wristZ: 0.3 }, { ...A_SHAPE, wristZ: -0.3 }),
+  bus: twoFrame(FINGERSPELLING.B, FIST, { ...FINGERSPELLING.B, wristZ: 0.3 }, FIST),
+  train: twoFrame(H_SHAPE, H_SHAPE, { ...H_SHAPE, wristZ: 0.4 }, H_SHAPE),
+  airplane: animSign([
     { right: Y_SHAPE, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
-    { right: { ...Y_SHAPE, wristZ: 0.3 }, left: FIST, face: NEUTRAL_FACE, holdMs: 400 },
+    { right: { ...Y_SHAPE, wristX: -0.2, wristZ: 0.3 }, left: FIST, face: NEUTRAL_FACE, holdMs: 420 },
   ]),
-  different: animSign([
-    { right: POINT_UP, left: POINT_UP, face: NEUTRAL_FACE, holdMs: 280 },
-    { right: { ...POINT_UP, wristZ: -0.4 }, left: { ...POINT_UP, wristZ: 0.4 }, face: NEUTRAL_FACE, holdMs: 400 },
+  bike: repeated(S_SHAPE, S_SHAPE, { ...S_SHAPE, wristZ: 0.4 }, { ...S_SHAPE, wristZ: -0.4 }),
+  money: twoFrame(FLAT_O, FLAT_B, { ...FLAT_O, wristX: 0.3 }, FLAT_B),
+  book: twoFrame(FLAT_B, FLAT_B, { ...FLAT_B, wristZ: 0.4 }, { ...FLAT_B, wristZ: -0.4 }),
+
+  // ── Possessions & Objects ─────────────────────────────────
+  key: repeated(X_SHAPE, FIST, { ...X_SHAPE, wristZ: 0.25 }, FIST),
+  door: twoFrame(FLAT_B, FLAT_B, { ...FLAT_B, wristZ: 0.5 }, FLAT_B),
+  window: twoFrame(H_SHAPE, H_SHAPE, { ...H_SHAPE, wristX: -0.3 }, H_SHAPE),
+  table: twoFrame(FLAT_B, FLAT_B, { ...FLAT_B, wristX: 0.3 }, FLAT_B),
+  chair: twoFrame(U_SHAPE, U_SHAPE, { ...U_SHAPE, wristX: 0.4 }, U_SHAPE),
+  bed: twoFrame(FLAT_B, FIST, { ...FLAT_B, wristX: 0.35 }, FIST),
+  cup: twoFrame(CURVED, FLAT_B, { ...CURVED, wristX: 0.3 }, FLAT_B),
+  bag: twoFrame(S_SHAPE, FIST, { ...S_SHAPE, wristX: 0.3 }, FIST),
+  clothes: repeated(OPEN5, OPEN5, { ...OPEN5, wristX: 0.2 }, { ...OPEN5, wristX: 0.2 }),
+  hat: twoFrame(FLAT_B, FIST, { ...FLAT_B, wristX: 0.3 }, FIST),
+  shoes: twoFrame(S_SHAPE, S_SHAPE, { ...S_SHAPE, wristX: 0.3 }, S_SHAPE),
+  medicine: repeated(M_SHAPE, FLAT_B, { ...M_SHAPE, wristZ: 0.2 }, FLAT_B),
+  paper: twoFrame(FLAT_B, FLAT_B, { ...FLAT_B, wristZ: 0.3 }, FLAT_B),
+  pen: twoFrame(G_SHAPE, FLAT_B, { ...G_SHAPE, wristZ: 0.25 }, FLAT_B),
+  letter: twoFrame(A_SHAPE, FLAT_B, { ...A_SHAPE, wristX: 0.3 }, FLAT_B),
+  gift: twoFrame(G_SHAPE, G_SHAPE, { ...G_SHAPE, wristZ: 0.3 }, { ...G_SHAPE, wristZ: 0.3 }),
+
+  // ── Phrases (common multi-word) ───────────────────────────
+  'i love you': staticSign(ILY, FIST, { ...HAPPY_FACE, mouthSmile: 0.95 }, 900),
+  'i am': staticSign(POINT_UP, FIST),
+  "i'm": staticSign(POINT_UP, FIST),
+  "i don't know": animSign([
+    { right: FLAT_B, left: FIST, face: WH_QUESTION_FACE, holdMs: 280 },
+    { right: { ...FLAT_B, wristZ: -0.4 }, left: FIST, face: WH_QUESTION_FACE, holdMs: 420 },
   ]),
-  new: animSign([
-    { right: CURVED, left: FLAT_B, face: NEUTRAL_FACE, holdMs: 280 },
-    { right: { ...CURVED, wristX: 0.2 }, left: FLAT_B, face: NEUTRAL_FACE, holdMs: 400 },
+  "don't know": animSign([
+    { right: FLAT_B, left: FIST, face: WH_QUESTION_FACE, holdMs: 280 },
+    { right: { ...FLAT_B, wristZ: -0.4 }, left: FIST, face: WH_QUESTION_FACE, holdMs: 420 },
   ]),
-  old: animSign([
-    { right: CURVED, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
-    { right: FIST, left: FIST, face: NEUTRAL_FACE, holdMs: 400 },
+  "don't": twoFrame(POINT_UP, FIST, { ...POINT_UP, wristZ: -0.4 }, FIST),
+  "can't": twoFrame(A_SHAPE, FIST, { ...A_SHAPE, wristX: 0.35 }, FIST),
+  "won't": twoFrame(A_SHAPE, FIST, { ...A_SHAPE, wristZ: -0.3 }, FIST),
+  "what's up": animSign([
+    { right: POINT_UP, left: FIST, face: QUESTION_FACE, holdMs: 300 },
+    { right: { ...POINT_UP, wristX: -0.3 }, left: FIST, face: QUESTION_FACE, holdMs: 400 },
   ]),
 
-  // Colors
-  red: animSign([
+  // ── ASL-specific terms ────────────────────────────────────
+  asl: animSign([
+    { right: FINGERSPELLING.A, left: FIST, face: NEUTRAL_FACE, holdMs: 240 },
+    { right: FINGERSPELLING.S, left: FIST, face: NEUTRAL_FACE, holdMs: 240 },
+    { right: FINGERSPELLING.L, left: FIST, face: NEUTRAL_FACE, holdMs: 300 },
+  ]),
+  deaf: animSign([
     { right: POINT_UP, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
-    { right: { ...POINT_UP, wristX: 0.2 }, left: FIST, face: NEUTRAL_FACE, holdMs: 400 },
+    { right: { ...POINT_UP, wristZ: 0.3 }, left: FIST, face: NEUTRAL_FACE, holdMs: 420 },
   ]),
-  blue: animSign([
-    { right: FINGERSPELLING.B, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
-    { right: { ...FINGERSPELLING.B, wristZ: 0.3 }, left: FIST, face: NEUTRAL_FACE, holdMs: 400 },
-  ]),
-  green: animSign([
-    { right: FINGERSPELLING.G, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
-    { right: { ...FINGERSPELLING.G, wristZ: 0.2 }, left: FIST, face: NEUTRAL_FACE, holdMs: 400 },
-  ]),
-  yellow: animSign([
-    { right: Y_SHAPE, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
-    { right: { ...Y_SHAPE, wristZ: 0.3 }, left: FIST, face: NEUTRAL_FACE, holdMs: 400 },
-  ]),
-  white: animSign([
-    { right: CURVED, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
-    { right: O_SHAPE, left: FIST, face: NEUTRAL_FACE, holdMs: 400 },
-  ]),
-  black: animSign([
+  hearing: animSign([
     { right: POINT_UP, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
-    { right: { ...POINT_UP, wristZ: -0.4 }, left: FIST, face: NEUTRAL_FACE, holdMs: 400 },
+    { right: { ...POINT_UP, wristZ: 0.2 }, left: FIST, face: NEUTRAL_FACE, holdMs: 420 },
   ]),
+  interpreter: repeated(V_SHAPE, V_SHAPE, { ...V_SHAPE, wristZ: 0.3 }, { ...V_SHAPE, wristZ: -0.3 }),
 
-  // Numbers
-  one: staticSign({ ...POINT_UP, thumb: { flex: 0.7, abd: 0 } }, FIST),
-  two: staticSign(V_SHAPE, FIST),
-  three: staticSign({ thumb: { flex: 0.1, abd: 0.7 }, index: { curl: 0, spread: -0.2 }, middle: { curl: 0, spread: 0.2 }, ring: { curl: 0.9, spread: 0 }, pinky: { curl: 0.9, spread: 0 } }, FIST),
-  four: staticSign({ thumb: { flex: 0.8, abd: 0 }, index: { curl: 0, spread: -0.3 }, middle: { curl: 0, spread: -0.1 }, ring: { curl: 0, spread: 0.1 }, pinky: { curl: 0, spread: 0.3 } }, FIST),
-  five: staticSign(OPEN, FIST),
-  six: staticSign({ thumb: { flex: 0, abd: 0.7 }, index: { curl: 0.9, spread: 0 }, middle: { curl: 0.9, spread: 0 }, ring: { curl: 0.9, spread: 0 }, pinky: { curl: 0, spread: 0 } }, FIST),
-  seven: staticSign({ thumb: { flex: 0.2, abd: 0.5 }, index: { curl: 0.9, spread: 0 }, middle: { curl: 0.9, spread: 0 }, ring: { curl: 0, spread: 0 }, pinky: { curl: 0.9, spread: 0 } }, FIST),
-  eight: staticSign({ thumb: { flex: 0.2, abd: 0.5 }, index: { curl: 0.9, spread: 0 }, middle: { curl: 0, spread: 0 }, ring: { curl: 0.9, spread: 0 }, pinky: { curl: 0.9, spread: 0 } }, FIST),
-  nine: staticSign(O_SHAPE, FIST),
-  ten: staticSign({ ...FINGERSPELLING.A, wristZ: 0.2 }, FIST),
-
-  // Animals
-  dog: staticSign({ ...FLAT_B, thumb: { flex: 0.3, abd: 0.8 } }, FIST),
-  cat: animSign([
-    { right: FINGERSPELLING.F, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
-    { right: { ...FINGERSPELLING.F, wristY: 0.3 }, left: FIST, face: NEUTRAL_FACE, holdMs: 400 },
+  // ── Modal verbs ───────────────────────────────────────────
+  can: twoFrame(S_SHAPE, S_SHAPE, { ...S_SHAPE, wristX: 0.3 }, S_SHAPE),
+  will: animSign([
+    { right: FLAT_B, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...FLAT_B, wristZ: 0.35 }, left: FIST, face: NEUTRAL_FACE, holdMs: 420 },
   ]),
-  bird: animSign([
-    { right: FINGERSPELLING.G, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
-    { right: { ...FINGERSPELLING.G, wristX: 0.2 }, left: FIST, face: NEUTRAL_FACE, holdMs: 400 },
-  ]),
+  should: twoFrame(S_SHAPE, FIST, { ...S_SHAPE, wristX: 0.3 }, FIST),
+  must: twoFrame(X_SHAPE, FIST, { ...X_SHAPE, wristX: 0.3 }, FIST),
+  would: twoFrame(W_SHAPE, FIST, { ...W_SHAPE, wristZ: 0.3 }, FIST),
+  could: twoFrame(C_SHAPE, FIST, { ...C_SHAPE, wristX: 0.3 }, FIST),
+  do: twoFrame(D_SHAPE, D_SHAPE, { ...D_SHAPE, wristZ: 0.3 }, { ...D_SHAPE, wristZ: -0.3 }),
+  be: staticSign(FLAT_B, FIST),
+  let: twoFrame(L_SHAPE, L_SHAPE, { ...L_SHAPE, wristZ: 0.3 }, { ...L_SHAPE, wristZ: 0.3 }),
 
-  // Misc
-  'i love you': staticSign(Y_SHAPE, FIST, { ...HAPPY_FACE, mouthSmile: 0.9 }, 1000),
+  // ── School / Learning ─────────────────────────────────────
+  test: repeated(T_SHAPE, FIST, { ...T_SHAPE, wristZ: 0.2 }, FIST),
+  class: twoFrame(C_SHAPE, C_SHAPE, { ...C_SHAPE, wristZ: 0.4 }, { ...C_SHAPE, wristZ: -0.4 }),
+  grade: twoFrame(G_SHAPE, FIST, { ...G_SHAPE, wristX: 0.3 }, FIST),
+  homework: repeated(H_SHAPE, FIST, { ...H_SHAPE, wristX: 0.2 }, FIST),
+  math: twoFrame(M_SHAPE, FIST, { ...M_SHAPE, wristZ: 0.3 }, FIST),
+  science: repeated(S_SHAPE, FIST, { ...S_SHAPE, wristZ: 0.25 }, FIST),
+  question: animSign([
+    { right: POINT_UP, left: FIST, face: QUESTION_FACE, holdMs: 280 },
+    { right: X_SHAPE, left: FIST, face: QUESTION_FACE, holdMs: 420 },
+  ]),
+  example: twoFrame(E_SHAPE, FIST, { ...E_SHAPE, wristZ: 0.3 }, FIST),
+  word: repeated(G_SHAPE, POINT_UP, { ...G_SHAPE, wristZ: 0.25 }, POINT_UP),
+  meaning: twoFrame(F_SHAPE, FIST, { ...F_SHAPE, wristZ: 0.3 }, FIST),
+  story: repeated(F_SHAPE, F_SHAPE, { ...F_SHAPE, wristZ: 0.3 }, { ...F_SHAPE, wristZ: -0.3 }),
+  language: twoFrame(L_SHAPE, L_SHAPE, { ...L_SHAPE, wristZ: 0.4 }, { ...L_SHAPE, wristZ: -0.4 }),
+
+  // ── Health ────────────────────────────────────────────────
+  hurt: repeated(POINT_UP, POINT_UP, { ...POINT_UP, wristZ: 0.3 }, { ...POINT_UP, wristZ: -0.3 }, SAD_FACE),
+  pain: repeated(POINT_UP, POINT_UP, { ...POINT_UP, wristZ: 0.3 }, { ...POINT_UP, wristZ: -0.3 }, SAD_FACE),
+  sick: twoFrame(CURVED, FIST, { ...CURVED, wristX: 0.3 }, FIST, SAD_FACE),
+  fever: twoFrame(CURVED, FIST, { ...CURVED, wristX: 0.3 }, FIST),
+  headache: repeated(POINT_UP, FIST, { ...POINT_UP, wristX: 0.25 }, FIST, SAD_FACE),
+  better: twoFrame(A_SHAPE, FIST, { ...A_SHAPE, wristX: -0.3 }, FIST, HAPPY_FACE),
+  worse: twoFrame(W_SHAPE, FIST, { ...W_SHAPE, wristX: 0.3 }, FIST, SAD_FACE),
+
+  // ── Sports & Activities ───────────────────────────────────
+  sport: repeated(S_SHAPE, S_SHAPE, { ...S_SHAPE, wristZ: 0.3 }, { ...S_SHAPE, wristZ: -0.3 }),
+  game: repeated(A_SHAPE, A_SHAPE, { ...A_SHAPE, wristZ: 0.3 }, { ...A_SHAPE, wristZ: -0.3 }),
+  team: repeated(T_SHAPE, FIST, { ...T_SHAPE, wristZ: 0.3 }, FIST),
+  ball: twoFrame(CURVED, CURVED, { ...CURVED, wristY: 0.3 }, { ...CURVED, wristY: -0.3 }),
+  music: repeated(OPEN5, CURVED, { ...OPEN5, wristZ: 0.3 }, CURVED),
+  dance: repeated(V_SHAPE, FLAT_B, { ...V_SHAPE, wristZ: 0.3 }, FLAT_B, HAPPY_FACE),
+  sing: repeated(OPEN5, FIST, { ...OPEN5, wristZ: 0.3 }, FIST),
+  art: twoFrame(A_SHAPE, FLAT_B, { ...A_SHAPE, wristZ: 0.4 }, FLAT_B),
+  draw: twoFrame(I_SHAPE, FLAT_B, { ...I_SHAPE, wristZ: 0.4 }, FLAT_B),
+  paint: repeated(FLAT_B, FLAT_B, { ...FLAT_B, wristZ: 0.3 }, FLAT_B),
+  photograph: twoFrame(L_SHAPE, CURVED, { ...L_SHAPE, wristX: 0.3 }, CURVED),
+
+  // ── Numbers used conversationally ────────────────────────
+  first: staticSign(POINT_UP, FIST),
+  third:  staticSign({ thumb: { flex: 0.1, abd: 0.7 }, index: { curl: 0, spread: -0.2 }, middle: { curl: 0, spread: 0.2 }, ring: { curl: 0.9, spread: 0 }, pinky: { curl: 0.9, spread: 0 } }, FIST),
+  last: twoFrame(L_SHAPE, POINT_UP, { ...L_SHAPE, wristX: 0.3 }, POINT_UP),
+
 };
 
 // ============================================================
-// Lookup functions
+// Irregular verb / word normalization map
+// ============================================================
+const IRREGULAR: Record<string, string> = {
+  // to be
+  am: 'be', is: 'be', are: 'be', was: 'be', were: 'be',
+  // to go
+  went: 'go', gone: 'go', going: 'go', goes: 'go',
+  // to come
+  came: 'come', comes: 'come', coming: 'come',
+  // to do
+  did: 'do', does: 'do', done: 'do', doing: 'do',
+  // to have
+  had: 'have', has: 'have', having: 'have',
+  // to say
+  said: 'say', says: 'say', saying: 'say',
+  // to see
+  saw: 'see', seen: 'see', seeing: 'see', sees: 'see',
+  // to know
+  knew: 'know', known: 'know', knowing: 'know', knows: 'know',
+  // to think
+  thought: 'think', thinks: 'think', thinking: 'think',
+  // to make
+  made: 'make', makes: 'make', making: 'make',
+  // to take
+  took: 'take', taken: 'take', taking: 'take', takes: 'take',
+  // to come
+  got: 'get', gotten: 'get', gets: 'get', getting: 'get',
+  // to give
+  gave: 'give', given: 'give', gives: 'give', giving: 'give',
+  // to find
+  found: 'find', finds: 'find', finding: 'find',
+  // to keep
+  kept: 'keep', keeps: 'keep', keeping: 'keep',
+  // to feel
+  felt: 'feel', feels: 'feel', feeling: 'feel',
+  // to leave
+  left: 'leave', leaves: 'leave', leaving: 'leave',
+  // to run
+  ran: 'run', runs: 'run', running: 'run',
+  // to drive
+  drove: 'drive', driven: 'drive', drives: 'drive', driving: 'drive',
+  // to write
+  wrote: 'write', written: 'write', writes: 'write', writing: 'write',
+  // to read
+  reading: 'read', reads: 'read',
+  // to sit
+  sat: 'sit', sits: 'sit', sitting: 'sit',
+  // to stand
+  stood: 'stand', stands: 'stand', standing: 'stand',
+  // to eat
+  ate: 'eat', eaten: 'eat', eats: 'eat', eating: 'eat',
+  // to drink
+  drank: 'drink', drunk: 'drink', drinks: 'drink', drinking: 'drink',
+  // to sleep
+  slept: 'sleep', sleeps: 'sleep', sleeping: 'sleep',
+  // to buy
+  bought: 'buy', buys: 'buy', buying: 'buy',
+  // to bring
+  brought: 'bring', brings: 'bring', bringing: 'bring',
+  // to teach
+  taught: 'teach', teaches: 'teach', teaching: 'teach',
+  // to learn
+  learnt: 'learn', learns: 'learn', learning: 'learn',
+  // contractions
+  "i'm":  'i',
+  "it's": 'it',
+  "he's": 'he',
+  "she's": 'she',
+  "we're": 'we',
+  "they're": 'they',
+  "i've": 'i',
+  "i'll": 'i',
+  "we'll": 'we',
+  "they'll": 'they',
+  "he'll": 'he',
+  "she'll": 'she',
+  "isn't": 'not',
+  "aren't": 'not',
+  "wasn't": 'not',
+  "weren't": 'not',
+  "haven't": 'not',
+  "hasn't": 'not',
+  "hadn't": 'not',
+  "can't": "can't",
+  "couldn't": 'can',
+  "won't": "won't",
+  "wouldn't": 'would',
+  "shouldn't": 'should',
+  "don't": "don't",
+  "doesn't": 'not',
+  "didn't": 'not',
+};
+
+// Suffixes to strip when looking up a word (in order of priority)
+const STRIP_SUFFIXES = [
+  'ness', 'ment', 'tion', 'sion', 'ous', 'ful', 'ive', 'ible', 'able',
+  'ing', 'ied', 'ied', 'ves', 'ies', 'ers', 'est', 'ely', 'ily',
+  'ed', 'er', 'ly', 'es', 's',
+];
+
+// ============================================================
+// Public API: look up a word → WordSign (or null = fingerspell)
 // ============================================================
 
-export function lookupSign(word: string): WordSign | null {
-  const normalized = word.toLowerCase().replace(/[^a-z\s]/g, '').trim();
-  return WORD_SIGNS[normalized] ?? null;
+/** Strip punctuation and lowercase */
+function normalise(raw: string): string {
+  return raw.toLowerCase().replace(/[^a-z'\s-]/g, '').trim();
 }
 
-export function letterToPose(letter: string): HandPose | null {
-  const upper = letter.toUpperCase();
-  return FINGERSPELLING[upper] ?? null;
+/** Try to find sign for a word, performing morphological reduction */
+export function lookupSign(rawWord: string): WordSign | null {
+  const word = normalise(rawWord);
+  if (!word) return null;
+
+  // 1. Direct match
+  if (WORD_SIGNS[word]) return WORD_SIGNS[word];
+
+  // 2. Irregular form
+  if (IRREGULAR[word]) {
+    const base = IRREGULAR[word];
+    if (WORD_SIGNS[base]) return WORD_SIGNS[base];
+  }
+
+  // 3. Strip suffixes
+  for (const suffix of STRIP_SUFFIXES) {
+    if (word.endsWith(suffix) && word.length > suffix.length + 2) {
+      const stem = word.slice(0, word.length - suffix.length);
+      if (WORD_SIGNS[stem]) return WORD_SIGNS[stem];
+      // Handle doubled consonant (running → run, hopped → hop)
+      if (stem.length > 1 && stem[stem.length - 1] === stem[stem.length - 2]) {
+        const dedoubled = stem.slice(0, -1);
+        if (WORD_SIGNS[dedoubled]) return WORD_SIGNS[dedoubled];
+      }
+      // Handle -e drop (making → make, loved → love)
+      if (WORD_SIGNS[stem + 'e']) return WORD_SIGNS[stem + 'e'];
+    }
+  }
+
+  return null; // signal: fingerspell
 }
 
-export function wordToSignQueue(word: string): Array<{ right: HandPose; left: HandPose; face: FaceExpression; holdMs: number }> {
+/** Convert a word to its fingerspelling sequence of HandPoses */
+export function fingerspellWord(word: string): HandPose[] {
+  return word
+    .toLowerCase()
+    .replace(/[^a-z]/g, '')
+    .split('')
+    .map(ch => FINGERSPELLING[ch.toUpperCase()] ?? FINGERSPELLING.A);
+}
+
+/**
+ * Primary public API for SignAvatar.
+ * Converts a raw spoken word into a sequence of sign keyframes.
+ * Falls back to letter-by-letter fingerspelling if no sign exists.
+ */
+export function wordToSignQueue(rawWord: string): SignKeyframe[] {
+  const word = normalise(rawWord);
+  if (!word) return [];
+
   const sign = lookupSign(word);
   if (sign) {
-    return sign.frames.map(f => ({
-      right: f.right,
-      left: f.left,
-      face: f.face ?? NEUTRAL_FACE,
-      holdMs: f.holdMs,
-    }));
+    return sign.frames.map(f => ({ ...f, face: f.face ?? NEUTRAL_FACE }));
   }
-  // Fingerspell the word
-  const letters = word.replace(/[^a-zA-Z]/g, '').toUpperCase().split('');
-  return letters.map(letter => {
-    const pose = FINGERSPELLING[letter] ?? FIST;
-    return { right: pose, left: FIST, face: NEUTRAL_FACE, holdMs: 400 };
-  });
+
+  // Fingerspell each letter with a short hold
+  const letters = fingerspellWord(word);
+  if (!letters.length) return [];
+  return letters.map(pose => ({
+    right: pose,
+    left:  FIST,
+    face:  NEUTRAL_FACE,
+    holdMs: 200,
+  }));
 }
