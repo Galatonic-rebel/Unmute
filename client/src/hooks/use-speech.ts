@@ -7,11 +7,13 @@ export function useSpeech() {
   const [interimResult, setInterimResult] = useState('');
   const [finalResult, setFinalResult] = useState('');
   const [currentWord, setCurrentWord] = useState('');
+  const [newFinalWords, setNewFinalWords] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const connectionRef = useRef<LiveClient | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const processedFinalRef = useRef<string>('');
 
   const cleanup = useCallback(() => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
@@ -28,10 +30,7 @@ export function useSpeech() {
     setIsConnecting(false);
   }, []);
 
-  // Ensure cleanup on unmount
-  useEffect(() => {
-    return cleanup;
-  }, [cleanup]);
+  useEffect(() => { return cleanup; }, [cleanup]);
 
   const startRecording = useCallback(async () => {
     try {
@@ -40,34 +39,31 @@ export function useSpeech() {
       setInterimResult('');
       setFinalResult('');
       setCurrentWord('');
+      setNewFinalWords([]);
+      processedFinalRef.current = '';
 
-      // 1. Fetch Token
       const tokenRes = await fetch('/api/deepgram/token');
       if (!tokenRes.ok) throw new Error('Failed to authenticate with Deepgram');
       const { key } = await tokenRes.json();
 
-      // 2. Get User Media
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
 
-      // 3. Initialize Deepgram
       const deepgram = createClient(key);
       const connection = deepgram.listen.live({
         model: 'nova-3',
         smart_format: true,
         interim_results: true,
         language: 'en',
+        utterance_end_ms: 1000,
       });
-
       connectionRef.current = connection;
 
       connection.on(LiveTranscriptionEvents.Open, () => {
         setIsConnecting(false);
         setIsRecording(true);
 
-        const mediaRecorder = new MediaRecorder(stream, {
-          mimeType: 'audio/webm',
-        });
+        const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
         mediaRecorderRef.current = mediaRecorder;
 
         mediaRecorder.addEventListener('dataavailable', (event) => {
@@ -75,28 +71,40 @@ export function useSpeech() {
             connection.send(event.data);
           }
         });
-
-        // Send audio chunks every 250ms
         mediaRecorder.start(250);
       });
 
       connection.on(LiveTranscriptionEvents.Transcript, (data) => {
         const transcript = data.channel.alternatives[0]?.transcript;
-        if (transcript) {
-          // Extract current word for avatar animation
-          const words = transcript.split(' ');
-          const lastWord = words[words.length - 1];
-          if (lastWord) setCurrentWord(lastWord);
+        if (!transcript) return;
 
-          if (data.is_final) {
-            setFinalResult((prev) => {
-              const newFinal = prev ? `${prev} ${transcript}` : transcript;
-              return newFinal;
-            });
-            setInterimResult('');
-          } else {
-            setInterimResult(transcript);
+        // Update interim display + current word for live feedback
+        const words = transcript.split(' ').filter(Boolean);
+        if (words.length > 0) {
+          setCurrentWord(words[words.length - 1]);
+        }
+
+        if (data.is_final) {
+          // Accumulate full text
+          setFinalResult(prev => prev ? `${prev} ${transcript}` : transcript);
+          setInterimResult('');
+
+          // Extract new words that haven't been sent to avatar yet
+          const cleanedNew = transcript.trim();
+          if (cleanedNew) {
+            const newWords = cleanedNew
+              .toLowerCase()
+              .replace(/[^a-z\s'-]/g, '')
+              .split(/\s+/)
+              .filter(Boolean);
+
+            if (newWords.length > 0) {
+              setNewFinalWords(newWords);
+            }
           }
+          processedFinalRef.current += ' ' + cleanedNew;
+        } else {
+          setInterimResult(transcript);
         }
       });
 
@@ -106,9 +114,7 @@ export function useSpeech() {
         cleanup();
       });
 
-      connection.on(LiveTranscriptionEvents.Close, () => {
-        cleanup();
-      });
+      connection.on(LiveTranscriptionEvents.Close, () => { cleanup(); });
 
     } catch (err) {
       console.error('Failed to start recording:', err);
@@ -117,9 +123,7 @@ export function useSpeech() {
     }
   }, [cleanup]);
 
-  const stopRecording = useCallback(() => {
-    cleanup();
-  }, [cleanup]);
+  const stopRecording = useCallback(() => { cleanup(); }, [cleanup]);
 
   return {
     isRecording,
@@ -127,6 +131,7 @@ export function useSpeech() {
     interimResult,
     finalResult,
     currentWord,
+    newFinalWords,
     error,
     startRecording,
     stopRecording,
@@ -134,7 +139,9 @@ export function useSpeech() {
       setInterimResult('');
       setFinalResult('');
       setCurrentWord('');
+      setNewFinalWords([]);
       setError(null);
-    }
+      processedFinalRef.current = '';
+    },
   };
 }
