@@ -189,7 +189,7 @@ export class AvatarController {
     );
     const angleA = Math.acos(cosA);
 
-    const poleOffset = side === 'left' ? -0.15 : 0.15;
+    const poleOffset = side === 'left' ? 0.15 : -0.15;
     const poleWorld = new THREE.Vector3(
       shoulderPos.x + poleOffset,
       shoulderPos.y - 0.5,
@@ -303,7 +303,7 @@ export class AvatarController {
   setHandTarget(side: 'left' | 'right', posX: number, posY: number, posZ: number, t: number) {
     if (!this._loaded) return;
 
-    const sign = side === 'left' ? -1 : 1;
+    const sign = side === 'left' ? 1 : -1;
     const target = new THREE.Vector3(
       sign * SIGN_SIDE_X + posX,
       SIGN_REST_MODEL_Y + posY,
