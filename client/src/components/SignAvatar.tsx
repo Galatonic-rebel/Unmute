@@ -111,9 +111,11 @@ export function SignAvatar({ currentWord, isRecording, signQueue }: SignAvatarPr
       scene.add(new THREE.Mesh(bgSphereGeo, bgMat));
 
       // ── Camera ─────────────────────────────────────────────────────────
-      const camera = new THREE.PerspectiveCamera(36, w / h, 0.01, 20);
-      camera.position.set(0, 0.18, 1.22);
-      camera.lookAt(0, 0.06, 0);
+      // FOV 44, pushed back to z=1.55 so the full head + hands at
+      // forehead (world y ≈ 0.60) stay comfortably in frame.
+      const camera = new THREE.PerspectiveCamera(44, w / h, 0.01, 20);
+      camera.position.set(0, 0.26, 1.55);
+      camera.lookAt(0, 0.26, 0);
 
       // ── Lighting ───────────────────────────────────────────────────────
       // Warm hemisphere (sky + ground)
@@ -185,43 +187,7 @@ export function SignAvatar({ currentWord, isRecording, signQueue }: SignAvatarPr
       collar.rotation.x = -0.15;
       scene.add(collar);
 
-      // ── Arms ──────────────────────────────────────────────────────────
-      // Upper arms — signer's RIGHT arm is on viewer's LEFT (x<0)
-      const armGeo = new THREE.CapsuleGeometry(0.050, 0.22, 4, 10);
-
-      // Signer's right upper arm → viewer's left
-      const rUpperArm = new THREE.Group();
-      rUpperArm.position.set(-0.22, 0.01, 0);
-      rUpperArm.rotation.z = 0.28;
-      rUpperArm.add(new THREE.Mesh(armGeo, shirtMat));
-      scene.add(rUpperArm);
-
-      // Signer's left upper arm → viewer's right
-      const lUpperArm = new THREE.Group();
-      lUpperArm.position.set( 0.22, 0.01, 0);
-      lUpperArm.rotation.z = -0.28;
-      lUpperArm.add(new THREE.Mesh(armGeo.clone(), shirtMat));
-      scene.add(lUpperArm);
-
-      // Forearms (skin) — matching upper arm sides
-      const skinArmMat = new THREE.MeshStandardMaterial({
-        color: 0xc8855a, roughness: 0.68, metalness: 0,
-      });
-      const forearmGeo = new THREE.CapsuleGeometry(0.040, 0.20, 4, 10);
-
-      // Signer's right forearm → viewer's left
-      const rForearm = new THREE.Mesh(forearmGeo, skinArmMat);
-      rForearm.position.set(-0.30, -0.17, 0.06);
-      rForearm.rotation.z = 0.08;
-      rForearm.castShadow = true;
-      scene.add(rForearm);
-
-      // Signer's left forearm → viewer's right
-      const lForearm = new THREE.Mesh(forearmGeo.clone(), skinArmMat);
-      lForearm.position.set( 0.30, -0.17, 0.06);
-      lForearm.rotation.z = -0.08;
-      lForearm.castShadow = true;
-      scene.add(lForearm);
+      // (Arms removed — hands-only display)
 
       // ── Face ──────────────────────────────────────────────────────────
       face = new FaceModel();

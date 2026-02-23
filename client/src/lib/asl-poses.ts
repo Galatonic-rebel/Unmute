@@ -1297,8 +1297,75 @@ export const WORD_SIGNS: Record<string, WordSign> = {
     { right: T_SHAPE, left: FIST, face: NEUTRAL_FACE, holdMs: 240 },
     { right: { thumb: { flex: 0.1, abd: 0.7 }, index: { curl: 0, spread: -0.2 }, middle: { curl: 0, spread: 0.2 }, ring: { curl: 0.9, spread: 0 }, pinky: { curl: 0.9, spread: 0 } }, left: FIST, face: NEUTRAL_FACE, holdMs: 300 },
   ]),
+  // FOURTEEN–NINETEEN: show the number handshape with a small shake
+  fourteen: repeated(
+    { thumb: { flex: 0.8, abd: 0 }, index: { curl: 0, spread: -0.28 }, middle: { curl: 0, spread: -0.08 }, ring: { curl: 0, spread: 0.08 }, pinky: { curl: 0, spread: 0.28 } },
+    FIST,
+    { thumb: { flex: 0.8, abd: 0 }, index: { curl: 0, spread: -0.28 }, middle: { curl: 0, spread: -0.08 }, ring: { curl: 0, spread: 0.08 }, pinky: { curl: 0, spread: 0.28 }, wristX: 0.18 },
+    FIST,
+  ),
+  fifteen: repeated(OPEN5, FIST, { ...OPEN5, wristX: 0.18 }, FIST),
+  sixteen: repeated(
+    { thumb: { flex: 0.1, abd: 0.6 }, index: { curl: 0.9, spread: 0 }, middle: { curl: 0.9, spread: 0 }, ring: { curl: 0.9, spread: 0 }, pinky: { curl: 0, spread: 0 } },
+    FIST,
+    { thumb: { flex: 0.1, abd: 0.6 }, index: { curl: 0.9, spread: 0 }, middle: { curl: 0.9, spread: 0 }, ring: { curl: 0.9, spread: 0 }, pinky: { curl: 0, spread: 0 }, wristX: 0.18 },
+    FIST,
+  ),
+  seventeen: repeated(
+    { thumb: { flex: 0.1, abd: 0.6 }, index: { curl: 0.9, spread: 0 }, middle: { curl: 0.9, spread: 0 }, ring: { curl: 0, spread: 0 }, pinky: { curl: 0.9, spread: 0 } },
+    FIST,
+    { thumb: { flex: 0.1, abd: 0.6 }, index: { curl: 0.9, spread: 0 }, middle: { curl: 0.9, spread: 0 }, ring: { curl: 0, spread: 0 }, pinky: { curl: 0.9, spread: 0 }, wristX: 0.18 },
+    FIST,
+  ),
+  eighteen: repeated(
+    { thumb: { flex: 0.2, abd: 0.5 }, index: { curl: 0.9, spread: 0 }, middle: { curl: 0, spread: 0 }, ring: { curl: 0.9, spread: 0 }, pinky: { curl: 0.9, spread: 0 } },
+    FIST,
+    { thumb: { flex: 0.2, abd: 0.5 }, index: { curl: 0.9, spread: 0 }, middle: { curl: 0, spread: 0 }, ring: { curl: 0.9, spread: 0 }, pinky: { curl: 0.9, spread: 0 }, wristX: 0.18 },
+    FIST,
+  ),
+  nineteen: repeated(
+    { thumb: { flex: 0.3, abd: 0.5 }, index: { curl: 0, spread: 0 }, middle: { curl: 0.9, spread: 0 }, ring: { curl: 0.9, spread: 0 }, pinky: { curl: 0.9, spread: 0 } },
+    FIST,
+    { thumb: { flex: 0.3, abd: 0.5 }, index: { curl: 0, spread: 0 }, middle: { curl: 0.9, spread: 0 }, ring: { curl: 0.9, spread: 0 }, pinky: { curl: 0.9, spread: 0 }, wristX: 0.18 },
+    FIST,
+  ),
   twenty: animSign([
     { right: V_SHAPE, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: O_SHAPE, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+  ]),
+  // TWENTY-ONE: V→O then raise index (1-hand)
+  'twenty-one': animSign([
+    { right: V_SHAPE, left: FIST, face: NEUTRAL_FACE, holdMs: 240 },
+    { right: O_SHAPE, left: FIST, face: NEUTRAL_FACE, holdMs: 240 },
+    { right: { ...POINT_UP, thumb: { flex: 0.72, abd: 0 } }, left: FIST, face: NEUTRAL_FACE, holdMs: 340 },
+  ]),
+  // TENS: each tens number → show the units digit handshape then close to O
+  thirty: animSign([
+    { right: { thumb: { flex: 0.1, abd: 0.7 }, index: { curl: 0, spread: -0.2 }, middle: { curl: 0, spread: 0.2 }, ring: { curl: 0.9, spread: 0 }, pinky: { curl: 0.9, spread: 0 } }, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: O_SHAPE, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+  ]),
+  forty: animSign([
+    { right: { thumb: { flex: 0.8, abd: 0 }, index: { curl: 0, spread: -0.28 }, middle: { curl: 0, spread: -0.08 }, ring: { curl: 0, spread: 0.08 }, pinky: { curl: 0, spread: 0.28 } }, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: O_SHAPE, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+  ]),
+  fifty: animSign([
+    { right: OPEN5, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: O_SHAPE, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+  ]),
+  sixty: animSign([
+    { right: { thumb: { flex: 0.1, abd: 0.6 }, index: { curl: 0.9, spread: 0 }, middle: { curl: 0.9, spread: 0 }, ring: { curl: 0.9, spread: 0 }, pinky: { curl: 0, spread: 0 } }, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: O_SHAPE, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+  ]),
+  seventy: animSign([
+    { right: { thumb: { flex: 0.1, abd: 0.6 }, index: { curl: 0.9, spread: 0 }, middle: { curl: 0.9, spread: 0 }, ring: { curl: 0, spread: 0 }, pinky: { curl: 0.9, spread: 0 } }, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: O_SHAPE, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+  ]),
+  eighty: animSign([
+    { right: { thumb: { flex: 0.2, abd: 0.5 }, index: { curl: 0.9, spread: 0 }, middle: { curl: 0, spread: 0 }, ring: { curl: 0.9, spread: 0 }, pinky: { curl: 0.9, spread: 0 } }, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: O_SHAPE, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+  ]),
+  ninety: animSign([
+    { right: { thumb: { flex: 0.3, abd: 0.5 }, index: { curl: 0, spread: 0 }, middle: { curl: 0.9, spread: 0 }, ring: { curl: 0.9, spread: 0 }, pinky: { curl: 0.9, spread: 0 } }, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
     { right: O_SHAPE, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
   ]),
   hundred: twoFrame(C_SHAPE, FIST, { ...C_SHAPE, wristX: 0.3 }, FIST),
@@ -1665,9 +1732,25 @@ const STRIP_SUFFIXES = [
 // Public API: look up a word → WordSign (or null = fingerspell)
 // ============================================================
 
-/** Strip punctuation and lowercase */
+/** Digit words for converting numeric characters to sign-lookup keys */
+const DIGIT_WORDS: Record<string, string> = {
+  '0': 'zero', '1': 'one', '2': 'two', '3': 'three', '4': 'four',
+  '5': 'five', '6': 'six', '7': 'seven', '8': 'eight', '9': 'nine',
+};
+/** Multi-digit number words (handles spoken numbers like "13", "20", etc.) */
+const NUMBER_WORDS: Record<string, string> = {
+  '10': 'ten', '11': 'eleven', '12': 'twelve', '13': 'thirteen',
+  '14': 'fourteen', '15': 'fifteen', '16': 'sixteen', '17': 'seventeen',
+  '18': 'eighteen', '19': 'nineteen', '20': 'twenty', '21': 'twenty-one',
+  '30': 'thirty', '40': 'forty', '50': 'fifty', '60': 'sixty',
+  '70': 'seventy', '80': 'eighty', '90': 'ninety', '100': 'hundred',
+};
+
+/** Strip punctuation and lowercase; convert digit strings to number words */
 function normalise(raw: string): string {
-  return raw.toLowerCase().replace(/[^a-z'\s-]/g, '').trim();
+  // First convert digit sequences to their word equivalents
+  const withWords = raw.replace(/\b\d+\b/g, (n) => NUMBER_WORDS[n] ?? (DIGIT_WORDS[n] ?? n));
+  return withWords.toLowerCase().replace(/[^a-z'\s-]/g, '').trim();
 }
 
 /** Try to find sign for a word, performing morphological reduction */
