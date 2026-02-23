@@ -429,22 +429,27 @@ export class FaceModel {
     this.root.add(phil);
 
     // ── Hair cap ──
-    // phiLength 0.74π covers the top + sides + back of the head, blending
-    // naturally with the skin at the hairline without leaving bare patches.
-    const hcg = new THREE.SphereGeometry(0.200, 28, 20, 0, Math.PI * 2, 0, Math.PI * 0.74);
+    // Geometry: phi = 0 (top of sphere) → phiLength = 0.38π = 68.4°
+    // With hair sphere center at y=0.015 and y-scale 1.24:
+    //   bottom edge y_local = 0.015 + 0.200 * 1.24 * cos(68.4°) = 0.015 + 0.092 = 0.107
+    //   world y = 0.50 + 0.107 * 0.95 ≈ 0.602
+    // Eyebrows sit at world y ≈ 0.586, eyes at 0.530.
+    // The hair cap therefore ends just ABOVE the eyebrows, so the entire
+    // forehead, eyes and face below are always clear skin — no dark mask.
+    const hcg = new THREE.SphereGeometry(0.200, 28, 20, 0, Math.PI * 2, 0, Math.PI * 0.38);
     hcg.scale(1.0, 1.24, 0.97);
     const hc = new THREE.Mesh(hcg, hm);
-    hc.position.y = 0.010;
+    hc.position.y = 0.015;
     this.root.add(hc);
 
-    // Subtle temple/sideburn strips — narrow flat capsules that hug the skull
-    [-0.172, 0.172].forEach(sx => {
-      const sg = new THREE.CapsuleGeometry(0.030, 0.072, 3, 10);
-      const s = new THREE.Mesh(sg, hm);
-      // Position at the temple area, tilted to follow the skull curve
-      s.position.set(sx, -0.018, 0.042);
-      s.rotation.z = sx < 0 ? 0.55 : -0.55;
-      s.rotation.y = sx < 0 ? 0.30 : -0.30;
+    // Small temple strips that blend the hair cap edge into the side of the skull.
+    // Kept at local y ≈ 0.075 (above eyebrows) so they never enter the face zone.
+    [-0.168, 0.168].forEach(sx => {
+      const sg = new THREE.CapsuleGeometry(0.026, 0.055, 3, 10);
+      const s  = new THREE.Mesh(sg, hm);
+      s.position.set(sx, 0.075, 0.028);
+      s.rotation.z = sx < 0 ?  0.45 : -0.45;
+      s.rotation.y = sx < 0 ?  0.22 : -0.22;
       this.root.add(s);
     });
 
