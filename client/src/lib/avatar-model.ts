@@ -16,6 +16,7 @@ const THUMB_ABD_MAX = Math.PI * 0.46;
 const THUMB_FLEX_WEIGHTS = [0.35, 0.42, 0.23];
 
 interface ArmChain {
+  shoulder: THREE.Bone;
   arm: THREE.Bone;
   forearm: THREE.Bone;
   hand: THREE.Bone;
@@ -23,14 +24,9 @@ interface ArmChain {
   lowerLen: number;
 }
 
-const IDLE_TARGETS = {
-  left:  new THREE.Vector3(-0.20, 1.00, 0.10),
-  right: new THREE.Vector3( 0.20, 1.00, 0.10),
-};
-
-const SIGN_REST_MODEL_Y = 0.97;
-const SIGN_BASE_Z = 0.18;
-const SIGN_SIDE_X = 0.14;
+const SIGN_REST_MODEL_Y = 1.15;
+const SIGN_BASE_Z = 0.22;
+const SIGN_SIDE_X = 0.10;
 
 export class AvatarController {
   public root: THREE.Group;
@@ -46,6 +42,11 @@ export class AvatarController {
 
   private spineBones: THREE.Bone[] = [];
   private spineRestQuats: THREE.Quaternion[] = [];
+
+  private idleArmQuats: Record<'left' | 'right', { arm: THREE.Quaternion; forearm: THREE.Quaternion }> = {
+    left: { arm: new THREE.Quaternion(), forearm: new THREE.Quaternion() },
+    right: { arm: new THREE.Quaternion(), forearm: new THREE.Quaternion() },
+  };
 
   private _loaded = false;
 
@@ -88,10 +89,11 @@ export class AvatarController {
 
     model.updateWorldMatrix(true, true);
     for (const side of ['Left', 'Right'] as const) {
+      const shoulder = this.bones.get(`${side}Shoulder`);
       const arm = this.bones.get(`${side}Arm`);
       const forearm = this.bones.get(`${side}ForeArm`);
       const hand = this.bones.get(`${side}Hand`);
-      if (arm && forearm && hand) {
+      if (shoulder && arm && forearm && hand) {
         const armPos = new THREE.Vector3();
         const forearmPos = new THREE.Vector3();
         const handPos = new THREE.Vector3();
@@ -101,7 +103,7 @@ export class AvatarController {
 
         const key = side.toLowerCase() as 'left' | 'right';
         this.armChains[key] = {
-          arm, forearm, hand,
+          shoulder, arm, forearm, hand,
           upperLen: armPos.distanceTo(forearmPos),
           lowerLen: forearmPos.distanceTo(handPos),
         };
@@ -116,10 +118,44 @@ export class AvatarController {
       }
     }
 
-    this._solveArmIK('left', IDLE_TARGETS.left, 1);
-    this._solveArmIK('right', IDLE_TARGETS.right, 1);
+    this._computeIdlePose();
+    this._applyIdlePose(1);
 
     this._loaded = true;
+  }
+
+  private _computeIdlePose() {
+    for (const side of ['left', 'right'] as const) {
+      const chain = this.armChains[side];
+      if (!chain) continue;
+
+      chain.arm.quaternion.copy(this.restQuats.get(chain.arm.name)!);
+      chain.forearm.quaternion.copy(this.restQuats.get(chain.forearm.name)!);
+      chain.arm.updateWorldMatrix(true, true);
+
+      const armRestQ = this.restQuats.get(chain.arm.name)!;
+      const forearmRestQ = this.restQuats.get(chain.forearm.name)!;
+
+      const sign = side === 'left' ? 1 : -1;
+      const armDown = new THREE.Quaternion().setFromEuler(
+        new THREE.Euler(0.18, 0, sign * 0.82)
+      );
+      const forearmBend = new THREE.Quaternion().setFromEuler(
+        new THREE.Euler(0.15, 0, sign * 0.05)
+      );
+
+      this.idleArmQuats[side].arm = armRestQ.clone().multiply(armDown);
+      this.idleArmQuats[side].forearm = forearmRestQ.clone().multiply(forearmBend);
+    }
+  }
+
+  private _applyIdlePose(t: number) {
+    for (const side of ['left', 'right'] as const) {
+      const chain = this.armChains[side];
+      if (!chain) continue;
+      chain.arm.quaternion.slerp(this.idleArmQuats[side].arm, t);
+      chain.forearm.quaternion.slerp(this.idleArmQuats[side].forearm, t);
+    }
   }
 
   private _solveArmIK(side: 'left' | 'right', targetModelPos: THREE.Vector3, t: number) {
@@ -135,10 +171,8 @@ export class AvatarController {
 
     const shoulderPos = new THREE.Vector3();
     const elbowRestPos = new THREE.Vector3();
-    const handRestPos = new THREE.Vector3();
     chain.arm.getWorldPosition(shoulderPos);
     chain.forearm.getWorldPosition(elbowRestPos);
-    chain.hand.getWorldPosition(handRestPos);
 
     const L1 = chain.upperLen;
     const L2 = chain.lowerLen;
@@ -155,10 +189,11 @@ export class AvatarController {
     );
     const angleA = Math.acos(cosA);
 
+    const poleOffset = side === 'left' ? -0.15 : 0.15;
     const poleWorld = new THREE.Vector3(
-      shoulderPos.x + (side === 'left' ? -0.1 : 0.1),
-      shoulderPos.y - 0.2,
-      shoulderPos.z - 0.6
+      shoulderPos.x + poleOffset,
+      shoulderPos.y - 0.5,
+      shoulderPos.z - 0.4
     );
 
     const toPole = poleWorld.clone().sub(shoulderPos);
@@ -280,8 +315,7 @@ export class AvatarController {
 
   resetArms(t: number) {
     if (!this._loaded) return;
-    this._solveArmIK('left', IDLE_TARGETS.left, t);
-    this._solveArmIK('right', IDLE_TARGETS.right, t);
+    this._applyIdlePose(t);
   }
 
   applyExpression(expr: FaceExpression, t: number) {
