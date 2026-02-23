@@ -89,43 +89,44 @@ export function SignAvatar({ currentWord, isRecording, signQueue }: SignAvatarPr
         bgSphereGeo.setAttribute('color', new THREE.Float32BufferAttribute(bgColors, 3));
         scene.add(new THREE.Mesh(bgSphereGeo, bgMat));
 
-        const camera = new THREE.PerspectiveCamera(46, w / h, 0.01, 20);
-        camera.position.set(0, 0.30, 1.90);
-        camera.lookAt(0, 0.30, 0);
+        const camera = new THREE.PerspectiveCamera(40, w / h, 0.01, 20);
+        camera.position.set(0, 0.32, 1.10);
+        camera.lookAt(0, 0.28, 0);
 
-        scene.add(new THREE.HemisphereLight(0xfff4e0, 0x1a1a2e, 0.45));
+        const pmremGen = new THREE.PMREMGenerator(renderer);
+        const envRT = pmremGen.fromScene(new THREE.Scene(), 0.04);
+        scene.environment = envRT.texture;
+        pmremGen.dispose();
 
-        const key = new THREE.DirectionalLight(0xffe8c0, 1.65);
-        key.position.set(-0.5, 1.8, 1.6);
+        scene.add(new THREE.HemisphereLight(0xfff4e0, 0x2a2a3e, 0.65));
+
+        const key = new THREE.DirectionalLight(0xffecd0, 2.0);
+        key.position.set(-0.6, 2.0, 1.8);
         key.castShadow = true;
-        key.shadow.mapSize.set(1024, 1024);
+        key.shadow.mapSize.set(2048, 2048);
         key.shadow.camera.near = 0.1;
         key.shadow.camera.far  = 10;
         key.shadow.camera.left = key.shadow.camera.bottom = -1.5;
         key.shadow.camera.right = key.shadow.camera.top = 1.5;
-        key.shadow.radius = 5;
-        key.shadow.bias   = -0.0005;
+        key.shadow.radius = 4;
+        key.shadow.bias   = -0.0003;
         scene.add(key);
 
-        const fill = new THREE.DirectionalLight(0xb0d8ff, 0.6);
-        fill.position.set(1.5, 0.4, 0.8);
+        const fill = new THREE.DirectionalLight(0xc0e0ff, 0.75);
+        fill.position.set(1.5, 0.6, 1.0);
         scene.add(fill);
 
-        const rim = new THREE.DirectionalLight(0xffc060, 0.5);
+        const rim = new THREE.DirectionalLight(0xffd080, 0.55);
         rim.position.set(0, 0.8, -2.5);
         scene.add(rim);
 
-        const under = new THREE.DirectionalLight(0x8060ff, 0.2);
-        under.position.set(0, -2, 0.5);
-        scene.add(under);
+        const bounce = new THREE.DirectionalLight(0x9090ff, 0.25);
+        bounce.position.set(0, -1.5, 0.8);
+        scene.add(bounce);
 
-        const groundGeo = new THREE.PlaneGeometry(4, 4);
-        const groundMat = new THREE.ShadowMaterial({ opacity: 0.18 });
-        const ground = new THREE.Mesh(groundGeo, groundMat);
-        ground.rotation.x = -Math.PI / 2;
-        ground.position.y = -0.75;
-        ground.receiveShadow = true;
-        scene.add(ground);
+        const face = new THREE.PointLight(0xffe8d8, 0.4, 3);
+        face.position.set(0, 0.45, 0.9);
+        scene.add(face);
 
         avatar = new AvatarController();
         await avatar.load('/avatar.glb');
@@ -173,6 +174,7 @@ export function SignAvatar({ currentWord, isRecording, signQueue }: SignAvatarPr
 
           const cur = currentItemRef.current;
           if (cur) {
+            av.applySway(now);
             const lerpT = Math.min(dt / 65, 1);
             av.applyHandPose('right', cur.right, lerpT);
             av.applyHandPose('left', cur.left, lerpT);
@@ -197,11 +199,11 @@ export function SignAvatar({ currentWord, isRecording, signQueue }: SignAvatarPr
             }
           } else {
             const idleT = Math.min(dt / 220, 1);
+            av.applySway(now);
             av.applyHandPose('right', IDLE_RIGHT, idleT);
             av.applyHandPose('left', IDLE_LEFT, idleT);
             av.applyExpression(NEUTRAL_FACE, idleT);
             av.resetArms(idleT);
-            av.applySway(now);
           }
 
           blinkTimerRef.current += dt;

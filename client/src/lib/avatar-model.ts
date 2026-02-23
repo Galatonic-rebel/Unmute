@@ -15,23 +15,22 @@ const THUMB_FLEX_MAX = Math.PI * 0.54;
 const THUMB_ABD_MAX = Math.PI * 0.46;
 const THUMB_FLEX_WEIGHTS = [0.35, 0.42, 0.23];
 
-const ARM_READY = {
-  armPitch: 1.05,
-  armYaw: 0.25,
-  elbowBend: 1.45,
-};
-
-const POS_SENSITIVITY = {
-  y: 2.5,
-  x: 2.0,
-  z: 1.5,
-};
-
 interface ArmChain {
   arm: THREE.Bone;
   forearm: THREE.Bone;
   hand: THREE.Bone;
+  upperLen: number;
+  lowerLen: number;
 }
+
+const IDLE_TARGETS = {
+  left:  new THREE.Vector3(-0.20, 1.00, 0.10),
+  right: new THREE.Vector3( 0.20, 1.00, 0.10),
+};
+
+const SIGN_REST_MODEL_Y = 0.97;
+const SIGN_BASE_Z = 0.18;
+const SIGN_SIDE_X = 0.14;
 
 export class AvatarController {
   public root: THREE.Group;
@@ -42,8 +41,6 @@ export class AvatarController {
 
   private headBone: THREE.Bone | null = null;
   private headRestQ = new THREE.Quaternion();
-
-  private readyQuats = new Map<string, THREE.Quaternion>();
 
   private armChains: Record<'left' | 'right', ArmChain | null> = { left: null, right: null };
 
@@ -78,8 +75,10 @@ export class AvatarController {
         }
         obj.castShadow = true;
         obj.receiveShadow = true;
-        if (obj.material instanceof THREE.MeshStandardMaterial) {
-          obj.material.envMapIntensity = 0.8;
+        const mat = obj.material;
+        if (mat instanceof THREE.MeshStandardMaterial) {
+          mat.envMapIntensity = 1.2;
+          mat.needsUpdate = true;
         }
       }
     });
@@ -87,12 +86,25 @@ export class AvatarController {
     this.headBone = this.bones.get('Head') ?? null;
     if (this.headBone) this.headRestQ.copy(this.headBone.quaternion);
 
+    model.updateWorldMatrix(true, true);
     for (const side of ['Left', 'Right'] as const) {
       const arm = this.bones.get(`${side}Arm`);
       const forearm = this.bones.get(`${side}ForeArm`);
       const hand = this.bones.get(`${side}Hand`);
       if (arm && forearm && hand) {
-        this.armChains[side.toLowerCase() as 'left' | 'right'] = { arm, forearm, hand };
+        const armPos = new THREE.Vector3();
+        const forearmPos = new THREE.Vector3();
+        const handPos = new THREE.Vector3();
+        arm.getWorldPosition(armPos);
+        forearm.getWorldPosition(forearmPos);
+        hand.getWorldPosition(handPos);
+
+        const key = side.toLowerCase() as 'left' | 'right';
+        this.armChains[key] = {
+          arm, forearm, hand,
+          upperLen: armPos.distanceTo(forearmPos),
+          lowerLen: forearmPos.distanceTo(handPos),
+        };
       }
     }
 
@@ -104,31 +116,99 @@ export class AvatarController {
       }
     }
 
-    this.setupReadyPose();
+    this._solveArmIK('left', IDLE_TARGETS.left, 1);
+    this._solveArmIK('right', IDLE_TARGETS.right, 1);
+
     this._loaded = true;
   }
 
-  private setupReadyPose() {
-    for (const side of ['left', 'right'] as const) {
-      const chain = this.armChains[side];
-      if (!chain) continue;
+  private _solveArmIK(side: 'left' | 'right', targetModelPos: THREE.Vector3, t: number) {
+    const chain = this.armChains[side];
+    if (!chain) return;
 
-      const prefix = side === 'left' ? 'Left' : 'Right';
-      const sign = side === 'left' ? 1 : -1;
+    const savedArmQ = chain.arm.quaternion.clone();
+    const savedForearmQ = chain.forearm.quaternion.clone();
 
-      const armRestQ = this.restQuats.get(`${prefix}Arm`)!.clone();
-      const pitchQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), ARM_READY.armPitch);
-      const yawQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), ARM_READY.armYaw * sign);
-      const armQ = armRestQ.clone().multiply(pitchQ).multiply(yawQ);
-      chain.arm.quaternion.copy(armQ);
-      this.readyQuats.set(`${side}Arm`, armQ.clone());
+    chain.arm.quaternion.copy(this.restQuats.get(chain.arm.name)!);
+    chain.forearm.quaternion.copy(this.restQuats.get(chain.forearm.name)!);
+    chain.arm.updateWorldMatrix(true, true);
 
-      const forearmRestQ = this.restQuats.get(`${prefix}ForeArm`)!.clone();
-      const bendQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), ARM_READY.elbowBend);
-      const forearmQ = forearmRestQ.clone().multiply(bendQ);
-      chain.forearm.quaternion.copy(forearmQ);
-      this.readyQuats.set(`${side}Forearm`, forearmQ.clone());
-    }
+    const shoulderPos = new THREE.Vector3();
+    const elbowRestPos = new THREE.Vector3();
+    const handRestPos = new THREE.Vector3();
+    chain.arm.getWorldPosition(shoulderPos);
+    chain.forearm.getWorldPosition(elbowRestPos);
+    chain.hand.getWorldPosition(handRestPos);
+
+    const L1 = chain.upperLen;
+    const L2 = chain.lowerLen;
+
+    const targetWorld = targetModelPos.clone().applyMatrix4(this.root.matrixWorld);
+
+    const toTarget = targetWorld.clone().sub(shoulderPos);
+    let dist = toTarget.length();
+    dist = THREE.MathUtils.clamp(dist, Math.abs(L1 - L2) + 0.005, (L1 + L2) - 0.005);
+    const targetDir = toTarget.clone().normalize();
+
+    const cosA = THREE.MathUtils.clamp(
+      (L1 * L1 + dist * dist - L2 * L2) / (2 * L1 * dist), -1, 1
+    );
+    const angleA = Math.acos(cosA);
+
+    const poleWorld = new THREE.Vector3(
+      shoulderPos.x + (side === 'left' ? -0.1 : 0.1),
+      shoulderPos.y - 0.2,
+      shoulderPos.z - 0.6
+    );
+
+    const toPole = poleWorld.clone().sub(shoulderPos);
+    const planeNormal = new THREE.Vector3().crossVectors(targetDir, toPole);
+    if (planeNormal.lengthSq() < 0.0001) planeNormal.set(0, 0, 1);
+    planeNormal.normalize();
+    const planeUp = new THREE.Vector3().crossVectors(planeNormal, targetDir).normalize();
+
+    const desiredArmDir = new THREE.Vector3()
+      .addScaledVector(targetDir, Math.cos(angleA))
+      .addScaledVector(planeUp, Math.sin(angleA))
+      .normalize();
+
+    const restArmDir = elbowRestPos.clone().sub(shoulderPos).normalize();
+
+    const armRotDelta = new THREE.Quaternion().setFromUnitVectors(restArmDir, desiredArmDir);
+
+    const armRestWorldQ = new THREE.Quaternion();
+    chain.arm.getWorldQuaternion(armRestWorldQ);
+
+    const armDesiredWorldQ = armRotDelta.clone().multiply(armRestWorldQ);
+
+    const armParentWorldQ = new THREE.Quaternion();
+    if (chain.arm.parent) chain.arm.parent.getWorldQuaternion(armParentWorldQ);
+    const armDesiredLocalQ = armParentWorldQ.clone().invert().multiply(armDesiredWorldQ);
+
+    chain.arm.quaternion.copy(armDesiredLocalQ);
+    chain.arm.updateWorldMatrix(false, true);
+
+    const newElbowPos = new THREE.Vector3();
+    const newHandPos = new THREE.Vector3();
+    chain.forearm.getWorldPosition(newElbowPos);
+    chain.hand.getWorldPosition(newHandPos);
+
+    const currentForearmDir = newHandPos.clone().sub(newElbowPos).normalize();
+    const desiredForearmDir = targetWorld.clone().sub(newElbowPos).normalize();
+
+    const forearmRotDelta = new THREE.Quaternion().setFromUnitVectors(currentForearmDir, desiredForearmDir);
+
+    const forearmCurrentWorldQ = new THREE.Quaternion();
+    chain.forearm.getWorldQuaternion(forearmCurrentWorldQ);
+
+    const forearmDesiredWorldQ = forearmRotDelta.clone().multiply(forearmCurrentWorldQ);
+
+    const forearmParentWorldQ = new THREE.Quaternion();
+    if (chain.forearm.parent) chain.forearm.parent.getWorldQuaternion(forearmParentWorldQ);
+    const forearmDesiredLocalQ = forearmParentWorldQ.clone().invert().multiply(forearmDesiredWorldQ);
+
+    chain.arm.quaternion.copy(savedArmQ).slerp(armDesiredLocalQ, t);
+    chain.forearm.quaternion.copy(savedForearmQ).slerp(forearmDesiredLocalQ, t);
   }
 
   applyHandPose(side: 'left' | 'right', pose: HandPose, t: number) {
@@ -185,36 +265,23 @@ export class AvatarController {
     }
   }
 
-  setHandTarget(side: 'left' | 'right', offsetX: number, offsetY: number, offsetZ: number, t: number) {
+  setHandTarget(side: 'left' | 'right', posX: number, posY: number, posZ: number, t: number) {
     if (!this._loaded) return;
-    const chain = this.armChains[side];
-    if (!chain) return;
 
-    const sign = side === 'left' ? 1 : -1;
+    const sign = side === 'left' ? -1 : 1;
+    const target = new THREE.Vector3(
+      sign * SIGN_SIDE_X + posX,
+      SIGN_REST_MODEL_Y + posY,
+      SIGN_BASE_Z + posZ
+    );
 
-    const armReadyQ = this.readyQuats.get(`${side}Arm`)!.clone();
-    const pitchDelta = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -offsetY * POS_SENSITIVITY.y);
-    const yawDelta = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), offsetX * POS_SENSITIVITY.x * sign);
-    const armTargetQ = armReadyQ.multiply(pitchDelta).multiply(yawDelta);
-    chain.arm.quaternion.slerp(armTargetQ, t);
-
-    const forearmReadyQ = this.readyQuats.get(`${side}Forearm`)!.clone();
-    const elbowDelta = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -offsetZ * POS_SENSITIVITY.z);
-    const forearmTargetQ = forearmReadyQ.multiply(elbowDelta);
-    chain.forearm.quaternion.slerp(forearmTargetQ, t);
+    this._solveArmIK(side, target, t);
   }
 
   resetArms(t: number) {
-    for (const side of ['left', 'right'] as const) {
-      const chain = this.armChains[side];
-      if (!chain) continue;
-
-      const armQ = this.readyQuats.get(`${side}Arm`);
-      if (armQ) chain.arm.quaternion.slerp(armQ, t);
-
-      const forearmQ = this.readyQuats.get(`${side}Forearm`);
-      if (forearmQ) chain.forearm.quaternion.slerp(forearmQ, t);
-    }
+    if (!this._loaded) return;
+    this._solveArmIK('left', IDLE_TARGETS.left, t);
+    this._solveArmIK('right', IDLE_TARGETS.right, t);
   }
 
   applyExpression(expr: FaceExpression, t: number) {
