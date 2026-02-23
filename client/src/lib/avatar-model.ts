@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import type { HandPose, FaceExpression } from './asl-poses';
 
 const FINGER_MAP: Record<string, string> = {
@@ -49,6 +50,11 @@ export class AvatarController {
   };
 
   private _loaded = false;
+
+  private mixer: THREE.AnimationMixer | null = null;
+  private clipCache = new Map<string, THREE.AnimationClip>();
+  private currentAction: THREE.AnimationAction | null = null;
+  private _animationPlaying = false;
 
   constructor() {
     this.root = new THREE.Group();
@@ -117,6 +123,8 @@ export class AvatarController {
         this.spineRestQuats.push(bone.quaternion.clone());
       }
     }
+
+    this.mixer = new THREE.AnimationMixer(model);
 
     this._computeIdlePose();
     this._applyIdlePose(1);
@@ -395,7 +403,72 @@ export class AvatarController {
     }
   }
 
+  async loadAndPlayAnimation(url: string): Promise<void> {
+    if (!this.mixer) return;
+
+    let clip = this.clipCache.get(url);
+    if (!clip) {
+      const fbxLoader = new FBXLoader();
+      const fbxGroup = await fbxLoader.loadAsync(url);
+      if (!fbxGroup.animations.length) {
+        console.warn('No animations found in', url);
+        return;
+      }
+      clip = fbxGroup.animations[0];
+      clip.tracks.forEach(track => {
+        track.name = track.name.replace(/^mixamorig:/, '');
+      });
+      this.clipCache.set(url, clip);
+    }
+
+    this.stopAnimation();
+
+    const action = this.mixer.clipAction(clip);
+    action.setLoop(THREE.LoopOnce, 1);
+    action.clampWhenFinished = true;
+    action.reset();
+    action.play();
+    this.currentAction = action;
+    this._animationPlaying = true;
+
+    return new Promise<void>((resolve) => {
+      const onFinished = (e: { action: THREE.AnimationAction }) => {
+        if (e.action === action) {
+          this.mixer?.removeEventListener('finished', onFinished);
+          this._animationPlaying = false;
+          action.fadeOut(0.3);
+          resolve();
+        }
+      };
+      this.mixer!.addEventListener('finished', onFinished);
+    });
+  }
+
+  updateMixer(deltaSeconds: number) {
+    this.mixer?.update(deltaSeconds);
+  }
+
+  stopAnimation() {
+    if (this.currentAction) {
+      this.currentAction.stop();
+      if (this.mixer) {
+        this.mixer.uncacheAction(this.currentAction.getClip());
+      }
+      this.currentAction = null;
+    }
+    this._animationPlaying = false;
+  }
+
+  isAnimationPlaying(): boolean {
+    return this._animationPlaying;
+  }
+
   dispose() {
+    this.stopAnimation();
+    if (this.mixer) {
+      this.mixer.stopAllAction();
+      this.mixer = null;
+    }
     this.root.traverse((obj) => {
       if (obj instanceof THREE.Mesh) {
         obj.geometry?.dispose();

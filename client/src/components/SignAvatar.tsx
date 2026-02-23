@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { AvatarController } from '@/lib/avatar-model';
-import { wordToSignQueue, NEUTRAL_FACE, OPEN, type FaceExpression, type HandPose } from '@/lib/asl-poses';
+import { wordToSignQueue, NEUTRAL_FACE, type FaceExpression, type HandPose } from '@/lib/asl-poses';
+import { getWordAnimationUrl, getLetterAnimationUrl, hasWordAnimation } from '@/lib/asl-animation';
 
 interface SignAvatarProps {
   currentWord: string;
@@ -34,12 +35,13 @@ export function SignAvatar({ currentWord, isRecording, signQueue }: SignAvatarPr
   const [webglError, setWebglError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const queueRef          = useRef<QueueItem[]>([]);
-  const currentItemRef    = useRef<QueueItem | null>(null);
-  const itemStartRef      = useRef<number>(0);
-  const blinkTimerRef     = useRef<number>(0);
-  const nextBlinkRef      = useRef<number>(2800 + Math.random() * 3000);
-  const prevSignQueueRef  = useRef<string[] | undefined>(undefined);
+  const poseQueueRef        = useRef<QueueItem[]>([]);
+  const currentItemRef      = useRef<QueueItem | null>(null);
+  const itemStartRef        = useRef<number>(0);
+  const blinkTimerRef       = useRef<number>(0);
+  const nextBlinkRef        = useRef<number>(2800 + Math.random() * 3000);
+  const prevSignQueueRef    = useRef<string[] | undefined>(undefined);
+  const abortRef            = useRef<AbortController | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -167,43 +169,51 @@ export function SignAvatar({ currentWord, isRecording, signQueue }: SignAvatarPr
           const av = avatarRef.current;
           if (!av || !av.isLoaded) return;
 
-          if (!currentItemRef.current && queueRef.current.length > 0) {
-            currentItemRef.current = queueRef.current.shift()!;
-            itemStartRef.current   = now;
-          }
+          av.updateMixer(dt / 1000);
 
-          const cur = currentItemRef.current;
-          if (cur) {
-            av.applySway(now);
-            const lerpT = Math.min(dt / 65, 1);
-            av.applyHandPose('right', cur.right, lerpT);
-            av.applyHandPose('left', cur.left, lerpT);
-            av.applyExpression(cur.face ?? NEUTRAL_FACE, lerpT);
+          const animPlaying = av.isAnimationPlaying();
 
-            const posT = Math.min(dt / 70, 1);
-            av.setHandTarget('right',
-              cur.right.posX ?? 0,
-              cur.right.posY ?? 0,
-              cur.right.posZ ?? 0,
-              posT
-            );
-            av.setHandTarget('left',
-              cur.left.posX ?? 0,
-              cur.left.posY ?? 0,
-              cur.left.posZ ?? 0,
-              posT
-            );
+          if (!animPlaying) {
+            if (!currentItemRef.current && poseQueueRef.current.length > 0) {
+              currentItemRef.current = poseQueueRef.current.shift()!;
+              itemStartRef.current   = now;
+            }
 
-            if (now - itemStartRef.current >= cur.holdMs) {
-              currentItemRef.current = null;
+            const cur = currentItemRef.current;
+            if (cur) {
+              av.applySway(now);
+              const lerpT = Math.min(dt / 65, 1);
+              av.applyHandPose('right', cur.right, lerpT);
+              av.applyHandPose('left', cur.left, lerpT);
+              av.applyExpression(cur.face ?? NEUTRAL_FACE, lerpT);
+
+              const posT = Math.min(dt / 70, 1);
+              av.setHandTarget('right',
+                cur.right.posX ?? 0,
+                cur.right.posY ?? 0,
+                cur.right.posZ ?? 0,
+                posT
+              );
+              av.setHandTarget('left',
+                cur.left.posX ?? 0,
+                cur.left.posY ?? 0,
+                cur.left.posZ ?? 0,
+                posT
+              );
+
+              if (now - itemStartRef.current >= cur.holdMs) {
+                currentItemRef.current = null;
+              }
+            } else {
+              const idleT = Math.min(dt / 220, 1);
+              av.applySway(now);
+              av.applyHandPose('right', IDLE_RIGHT, idleT);
+              av.applyHandPose('left', IDLE_LEFT, idleT);
+              av.applyExpression(NEUTRAL_FACE, idleT);
+              av.resetArms(idleT);
             }
           } else {
-            const idleT = Math.min(dt / 220, 1);
             av.applySway(now);
-            av.applyHandPose('right', IDLE_RIGHT, idleT);
-            av.applyHandPose('left', IDLE_LEFT, idleT);
-            av.applyExpression(NEUTRAL_FACE, idleT);
-            av.resetArms(idleT);
           }
 
           blinkTimerRef.current += dt;
@@ -239,6 +249,7 @@ export function SignAvatar({ currentWord, isRecording, signQueue }: SignAvatarPr
     return () => {
       cancelled = true;
       cancelAnimationFrame(rafRef.current);
+      if (abortRef.current) abortRef.current.abort();
       if (ro) ro.disconnect();
       if (avatarRef.current) { avatarRef.current.dispose(); avatarRef.current = null; }
       if (rendererRef.current) { rendererRef.current.dispose(); rendererRef.current = null; }
@@ -248,16 +259,66 @@ export function SignAvatar({ currentWord, isRecording, signQueue }: SignAvatarPr
   useEffect(() => {
     if (!signQueue?.length || signQueue === prevSignQueueRef.current) return;
     prevSignQueueRef.current = signQueue;
-    queueRef.current         = [];
-    currentItemRef.current   = null;
-    signQueue.forEach(word => {
-      queueRef.current.push(...wordToSignQueue(word));
-    });
+
+    if (abortRef.current) abortRef.current.abort();
+    const ac = new AbortController();
+    abortRef.current = ac;
+
+    const av = avatarRef.current;
+    if (!av) return;
+
+    av.stopAnimation();
+    poseQueueRef.current   = [];
+    currentItemRef.current = null;
+
+    (async () => {
+      for (const word of signQueue) {
+        if (ac.signal.aborted) return;
+
+        const lower = word.toLowerCase().trim();
+        if (!lower) continue;
+
+        if (hasWordAnimation(lower)) {
+          try {
+            await av.loadAndPlayAnimation(getWordAnimationUrl(lower)!);
+          } catch (err) {
+            console.warn('FBX animation failed for word:', lower, err);
+            const fallback = wordToSignQueue(lower);
+            poseQueueRef.current.push(...fallback);
+            const totalMs = fallback.reduce((sum, f) => sum + f.holdMs, 0);
+            await waitMs(totalMs + 200, ac.signal);
+          }
+        } else {
+          const poseFrames = wordToSignQueue(lower);
+          if (poseFrames.length > 0) {
+            poseQueueRef.current.push(...poseFrames);
+            const totalMs = poseFrames.reduce((sum, f) => sum + f.holdMs, 0);
+            await waitMs(totalMs + 200, ac.signal);
+          } else {
+            for (const letter of lower) {
+              if (ac.signal.aborted) return;
+              if (/[a-z]/.test(letter)) {
+                try {
+                  await av.loadAndPlayAnimation(getLetterAnimationUrl(letter));
+                } catch (err) {
+                  console.warn('FBX letter animation failed:', letter, err);
+                }
+              }
+            }
+          }
+        }
+
+        if (ac.signal.aborted) return;
+      }
+    })();
   }, [signQueue]);
 
   useEffect(() => {
     if (!isRecording) {
-      queueRef.current       = [];
+      if (abortRef.current) abortRef.current.abort();
+      const av = avatarRef.current;
+      if (av) av.stopAnimation();
+      poseQueueRef.current   = [];
       currentItemRef.current = null;
     }
   }, [isRecording]);
@@ -335,4 +396,12 @@ export function SignAvatar({ currentWord, isRecording, signQueue }: SignAvatarPr
       )}
     </div>
   );
+}
+
+function waitMs(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    if (signal.aborted) { resolve(); return; }
+    const timer = setTimeout(resolve, ms);
+    signal.addEventListener('abort', () => { clearTimeout(timer); resolve(); }, { once: true });
+  });
 }
