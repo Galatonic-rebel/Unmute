@@ -195,7 +195,10 @@ export function SignAvatar({ currentWord, isRecording, signQueue }: SignAvatarPr
       face = new FaceModel();
       face.root.position.set(0, 0.50, 0.01);
       face.root.scale.setScalar(0.95);
-      face.root.traverse(c => { if (c instanceof THREE.Mesh) { c.castShadow = true; c.receiveShadow = true; } });
+      // Face casts shadows on the scene but does NOT receive them —
+      // receiveShadow on the head sphere causes the forehead to
+      // self-shadow the eye area with a dark band artifact.
+      face.root.traverse(c => { if (c instanceof THREE.Mesh) { c.castShadow = true; c.receiveShadow = false; } });
       scene.add(face.root);
       faceRef.current = face;
       face.applyExpression(NEUTRAL_FACE);

@@ -313,13 +313,15 @@ export class FaceModel {
     });
 
     // ── Cheeks ──
+    // Smaller scale (0.38) and pushed slightly back so they read as
+    // subtle cheek definition rather than protruding spheres.
     const ckGeo = new THREE.SphereGeometry(0.072, 12, 9);
     this.leftCheek  = new THREE.Mesh(ckGeo,       skl);
     this.rightCheek = new THREE.Mesh(ckGeo.clone(), skl);
-    this.leftCheek.position.set( -0.118, -0.032, 0.128);
-    this.rightCheek.position.set(  0.118, -0.032, 0.128);
-    this.leftCheek.scale.setScalar(0.50);
-    this.rightCheek.scale.setScalar(0.50);
+    this.leftCheek.position.set( -0.110, -0.040, 0.118);
+    this.rightCheek.position.set(  0.110, -0.040, 0.118);
+    this.leftCheek.scale.set(0.38, 0.32, 0.28);
+    this.rightCheek.scale.set(0.38, 0.32, 0.28);
     this.root.add(this.leftCheek, this.rightCheek);
 
     // ── Nose ──
@@ -427,17 +429,22 @@ export class FaceModel {
     this.root.add(phil);
 
     // ── Hair cap ──
-    const hcg = new THREE.SphereGeometry(0.196, 24, 18, 0, Math.PI * 2, 0, Math.PI * 0.56);
-    hcg.scale(1.0, 1.24, 0.96);
+    // phiLength 0.74π covers the top + sides + back of the head, blending
+    // naturally with the skin at the hairline without leaving bare patches.
+    const hcg = new THREE.SphereGeometry(0.200, 28, 20, 0, Math.PI * 2, 0, Math.PI * 0.74);
+    hcg.scale(1.0, 1.24, 0.97);
     const hc = new THREE.Mesh(hcg, hm);
-    hc.position.y = 0.018;
+    hc.position.y = 0.010;
     this.root.add(hc);
 
-    [-0.166, 0.166].forEach(sx => {
-      const sg = new THREE.CapsuleGeometry(0.054, 0.080, 3, 12);
+    // Subtle temple/sideburn strips — narrow flat capsules that hug the skull
+    [-0.172, 0.172].forEach(sx => {
+      const sg = new THREE.CapsuleGeometry(0.030, 0.072, 3, 10);
       const s = new THREE.Mesh(sg, hm);
-      s.position.set(sx, 0.046, -0.018);
-      s.rotation.z = sx < 0 ? 0.32 : -0.32;
+      // Position at the temple area, tilted to follow the skull curve
+      s.position.set(sx, -0.018, 0.042);
+      s.rotation.z = sx < 0 ? 0.55 : -0.55;
+      s.rotation.y = sx < 0 ? 0.30 : -0.30;
       this.root.add(s);
     });
 
@@ -473,9 +480,15 @@ export class FaceModel {
     this.upperLip.scale.x = lr(this.upperLip.scale.x, smX);
     this.lowerLip.scale.x = lr(this.lowerLip.scale.x, smX);
 
-    const cks = 0.50 + (e.cheekPuff ?? 0) * 0.55;
-    this.leftCheek.scale.setScalar(lr(this.leftCheek.scale.x, cks));
-    this.rightCheek.scale.setScalar(lr(this.rightCheek.scale.x, cks));
+    // Cheek puff: animate from the flattened rest shape toward a puffed sphere.
+    // Base scale matches the constructor: (0.38, 0.32, 0.28).
+    const ckp = e.cheekPuff ?? 0;
+    this.leftCheek.scale.x  = lr(this.leftCheek.scale.x,  0.38 + ckp * 0.38);
+    this.leftCheek.scale.y  = lr(this.leftCheek.scale.y,  0.32 + ckp * 0.44);
+    this.leftCheek.scale.z  = lr(this.leftCheek.scale.z,  0.28 + ckp * 0.48);
+    this.rightCheek.scale.x = lr(this.rightCheek.scale.x, 0.38 + ckp * 0.38);
+    this.rightCheek.scale.y = lr(this.rightCheek.scale.y, 0.32 + ckp * 0.44);
+    this.rightCheek.scale.z = lr(this.rightCheek.scale.z, 0.28 + ckp * 0.48);
 
     this.root.rotation.x = lr(this.root.rotation.x, e.headTiltX ?? 0);
     this.root.rotation.y = lr(this.root.rotation.y, e.headTiltY ?? 0);
