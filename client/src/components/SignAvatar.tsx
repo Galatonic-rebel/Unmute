@@ -111,11 +111,13 @@ export function SignAvatar({ currentWord, isRecording, signQueue }: SignAvatarPr
       scene.add(new THREE.Mesh(bgSphereGeo, bgMat));
 
       // ── Camera ─────────────────────────────────────────────────────────
-      // FOV 44, pushed back to z=1.55 so the full head + hands at
-      // forehead (world y ≈ 0.60) stay comfortably in frame.
-      const camera = new THREE.PerspectiveCamera(44, w / h, 0.01, 20);
-      camera.position.set(0, 0.26, 1.55);
-      camera.lookAt(0, 0.26, 0);
+      // Hair cap top world-y ≈ 0.75 (face root 0.50 + cap 0.25).
+      // FOV 46 at z = 1.90 gives visible half-height ≈ 0.80 above/below
+      // the lookAt centre (y=0.30), so full range 0.30±0.80 = [-0.50 … 1.10].
+      // That comfortably fits the hair top (0.75) and resting hands (-0.08).
+      const camera = new THREE.PerspectiveCamera(46, w / h, 0.01, 20);
+      camera.position.set(0, 0.30, 1.90);
+      camera.lookAt(0, 0.30, 0);
 
       // ── Lighting ───────────────────────────────────────────────────────
       // Warm hemisphere (sky + ground)

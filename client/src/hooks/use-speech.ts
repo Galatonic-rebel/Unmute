@@ -89,12 +89,14 @@ export function useSpeech() {
           setFinalResult(prev => prev ? `${prev} ${transcript}` : transcript);
           setInterimResult('');
 
-          // Extract new words that haven't been sent to avatar yet
+          // Extract new words that haven't been sent to avatar yet.
+          // Keep digits (0-9) so number words like "10", "20" reach the
+          // sign dictionary, which converts them to "ten", "twenty", etc.
           const cleanedNew = transcript.trim();
           if (cleanedNew) {
             const newWords = cleanedNew
               .toLowerCase()
-              .replace(/[^a-z\s'-]/g, '')
+              .replace(/[^a-z0-9\s'-]/g, '')
               .split(/\s+/)
               .filter(Boolean);
 
