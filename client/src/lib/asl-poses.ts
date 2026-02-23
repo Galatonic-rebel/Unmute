@@ -457,8 +457,17 @@ const I_SHAPE: HandPose = {
   pinky:  { curl: 0,   spread: 0 },
 };
 
+// "Open 8" / FEEL handshape: middle finger bent, others relaxed
+const FEEL_HP: HandPose = {
+  thumb:  { flex: 0.1, abd: 0.4 },
+  index:  { curl: 0,   spread: -0.1 },
+  middle: { curl: 0.65, spread: 0 },
+  ring:   { curl: 0,   spread: 0.1 },
+  pinky:  { curl: 0,   spread: 0.2 },
+};
+
 // ============================================================
-// Word Sign Dictionary  (400+ entries)
+// Word Sign Dictionary  (550+ entries)
 // ============================================================
 export const WORD_SIGNS: Record<string, WordSign> = {
 
@@ -1625,6 +1634,537 @@ export const WORD_SIGNS: Record<string, WordSign> = {
   third:  staticSign({ thumb: { flex: 0.1, abd: 0.7 }, index: { curl: 0, spread: -0.2 }, middle: { curl: 0, spread: 0.2 }, ring: { curl: 0.9, spread: 0 }, pinky: { curl: 0.9, spread: 0 } }, FIST),
   last: twoFrame(L_SHAPE, POINT_UP, { ...L_SHAPE, wristX: 0.3 }, POINT_UP),
 
+  // ── FEEL – critical verb (open-8 / bent-middle brushes up chest) ──
+  feel: animSign([
+    { right: atPos(FEEL_HP, AT_CHEST, 0.07), left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...atPos(FEEL_HP, AT_CHEST + 0.07, 0.07), wristX: 0.10 }, left: FIST, face: NEUTRAL_FACE, holdMs: 260 },
+    { right: atPos(FEEL_HP, AT_CHEST, 0.07), left: FIST, face: NEUTRAL_FACE, holdMs: 260 },
+  ]),
+
+  // ── Greetings / Farewells not yet covered ────────────────
+  'good morning': animSign([
+    { right: atPos(FLAT_B, AT_CHIN, 0.02, +0.04), left: FIST, face: HAPPY_FACE, holdMs: 260 },
+    { right: { ...atPos(FLAT_B, AT_CHIN - 0.06, 0.12), wristX: 0.22 }, left: FLAT_B, face: HAPPY_FACE, holdMs: 280 },
+    { right: FLAT_B, left: CURVED, face: HAPPY_FACE, holdMs: 260 },
+    { right: { ...FLAT_B, wristX: -0.30 }, left: CURVED, face: HAPPY_FACE, holdMs: 380 },
+  ]),
+  'good afternoon': animSign([
+    { right: atPos(FLAT_B, AT_CHIN, 0.02, +0.04), left: FIST, face: HAPPY_FACE, holdMs: 260 },
+    { right: { ...atPos(FLAT_B, AT_CHIN - 0.06, 0.12), wristX: 0.22 }, left: FLAT_B, face: HAPPY_FACE, holdMs: 280 },
+    { right: FLAT_B, left: FLAT_B, face: HAPPY_FACE, holdMs: 260 },
+    { right: { ...FLAT_B, wristX: 0.30 }, left: FLAT_B, face: HAPPY_FACE, holdMs: 380 },
+  ]),
+  'good evening': animSign([
+    { right: atPos(FLAT_B, AT_CHIN, 0.02, +0.04), left: FIST, face: HAPPY_FACE, holdMs: 260 },
+    { right: { ...atPos(FLAT_B, AT_CHIN - 0.06, 0.12), wristX: 0.22 }, left: FLAT_B, face: HAPPY_FACE, holdMs: 280 },
+    { right: FLAT_B, left: CURVED, face: { ...HAPPY_FACE, eyeSquint: 0.1 }, holdMs: 260 },
+    { right: { ...FLAT_B, wristX: 0.28 }, left: CURVED, face: { ...HAPPY_FACE, eyeSquint: 0.1 }, holdMs: 380 },
+  ]),
+  'good night': animSign([
+    { right: atPos(FLAT_B, AT_CHIN, 0.02, +0.04), left: FIST, face: HAPPY_FACE, holdMs: 240 },
+    { right: { ...atPos(FLAT_B, AT_CHIN - 0.06, 0.12), wristX: 0.22 }, left: FLAT_B, face: HAPPY_FACE, holdMs: 260 },
+    { right: FLAT_B, left: CURVED, face: { ...NEUTRAL_FACE, eyeSquint: 0.3 }, holdMs: 260 },
+    { right: { ...FLAT_B, wristX: -0.30 }, left: CURVED, face: { ...NEUTRAL_FACE, eyeSquint: 0.3 }, holdMs: 400 },
+  ]),
+  goodnight: animSign([
+    { right: atPos(FLAT_B, AT_CHIN, 0.02, +0.04), left: FIST, face: HAPPY_FACE, holdMs: 240 },
+    { right: { ...atPos(FLAT_B, AT_CHIN - 0.06, 0.12), wristX: 0.22 }, left: FLAT_B, face: HAPPY_FACE, holdMs: 260 },
+    { right: FLAT_B, left: CURVED, face: { ...NEUTRAL_FACE, eyeSquint: 0.3 }, holdMs: 260 },
+    { right: { ...FLAT_B, wristX: -0.30 }, left: CURVED, face: { ...NEUTRAL_FACE, eyeSquint: 0.3 }, holdMs: 400 },
+  ]),
+  'see you': animSign([
+    { right: V_SHAPE, left: FIST, face: HAPPY_FACE, holdMs: 280 },
+    { right: { ...POINT_UP, wristZ: 0.18 }, left: FIST, face: HAPPY_FACE, holdMs: 440 },
+  ]),
+  'see you later': animSign([
+    { right: V_SHAPE, left: FIST, face: HAPPY_FACE, holdMs: 240 },
+    { right: { ...POINT_UP, wristZ: 0.18 }, left: FIST, face: HAPPY_FACE, holdMs: 240 },
+    { right: L_SHAPE, left: FIST, face: HAPPY_FACE, holdMs: 240 },
+    { right: { ...L_SHAPE, wristZ: 0.35 }, left: FIST, face: HAPPY_FACE, holdMs: 360 },
+  ]),
+  'good luck': animSign([
+    { right: atPos(FLAT_B, AT_CHIN, 0.02, +0.04), left: FIST, face: HAPPY_FACE, holdMs: 240 },
+    { right: { ...atPos(FLAT_B, AT_CHIN - 0.06, 0.12), wristX: 0.22 }, left: FLAT_B, face: HAPPY_FACE, holdMs: 260 },
+    { right: L_SHAPE, left: FIST, face: HAPPY_FACE, holdMs: 240 },
+    { right: { ...L_SHAPE, wristX: -0.20 }, left: FIST, face: HAPPY_FACE, holdMs: 380 },
+  ]),
+
+  // ── Quantifiers / Determiners (critical gap) ─────────────
+  // ALL: flat hand sweeps across curved palm, closes
+  all: animSign([
+    { right: FLAT_B, left: CURVED, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...FLAT_B, wristZ: -0.45 }, left: CURVED, face: NEUTRAL_FACE, holdMs: 420 },
+  ]),
+  // BOTH: V-hand draws together into bent-V
+  both: animSign([
+    { right: V_SHAPE, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: CURVED, left: FIST, face: NEUTRAL_FACE, holdMs: 440 },
+  ]),
+  some: twoFrame(A_SHAPE, FLAT_B, { ...A_SHAPE, wristZ: 0.30 }, FLAT_B),
+  any:  twoFrame(A_SHAPE, FIST,   { ...A_SHAPE, wristZ: 0.30 }, FIST),
+  every: repeated(A_SHAPE, POINT_UP, { ...A_SHAPE, wristX: 0.22 }, POINT_UP),
+  each:  repeated(A_SHAPE, POINT_UP, { ...A_SHAPE, wristX: 0.22 }, POINT_UP),
+  many: animSign([
+    { right: S_SHAPE, left: S_SHAPE, face: NEUTRAL_FACE, holdMs: 240 },
+    { right: OPEN5, left: OPEN5, face: NEUTRAL_FACE, holdMs: 420 },
+  ]),
+  much: animSign([
+    { right: CURVED, left: CURVED, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...CURVED, wristX: -0.30 }, left: { ...CURVED, wristX: 0.30 }, face: NEUTRAL_FACE, holdMs: 420 },
+  ]),
+  most: twoFrame(A_SHAPE, A_SHAPE, { ...A_SHAPE, wristX: -0.30 }, A_SHAPE),
+  other:   twoFrame(A_SHAPE, FIST, { ...A_SHAPE, wristZ: -0.30 }, FIST),
+  another: twoFrame(A_SHAPE, FIST, { ...A_SHAPE, wristZ:  0.30 }, FIST),
+  several: repeated(
+    { thumb: { flex: 0.8, abd: 0 }, index: { curl: 0, spread: -0.28 }, middle: { curl: 0, spread: -0.08 }, ring: { curl: 0, spread: 0.08 }, pinky: { curl: 0, spread: 0.28 } },
+    FIST,
+    { thumb: { flex: 0.8, abd: 0 }, index: { curl: 0, spread: -0.28 }, middle: { curl: 0, spread: -0.08 }, ring: { curl: 0, spread: 0.08 }, pinky: { curl: 0, spread: 0.28 }, wristY: 0.20 },
+    FIST,
+  ),
+  few: twoFrame(
+    { thumb: { flex: 0.8, abd: 0 }, index: { curl: 0, spread: -0.28 }, middle: { curl: 0, spread: -0.08 }, ring: { curl: 0, spread: 0.08 }, pinky: { curl: 0, spread: 0.28 } },
+    FIST,
+    FIST, FIST,
+  ),
+  everything: twoFrame(E_SHAPE, FIST, { ...E_SHAPE, wristZ: 0.35 }, FIST),
+  nothing: animSign([
+    { right: O_SHAPE, left: O_SHAPE, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...O_SHAPE, wristZ: 0.30 }, left: { ...O_SHAPE, wristZ: -0.30 }, face: NEUTRAL_FACE, holdMs: 420 },
+  ]),
+  something:  staticSign(S_SHAPE, FIST),
+  anything:   twoFrame(A_SHAPE, FIST, { ...A_SHAPE, wristZ: 0.30 }, FIST),
+  everyone:   repeated(E_SHAPE, FIST, { ...E_SHAPE, wristY: 0.25 }, FIST),
+  everybody:  repeated(E_SHAPE, FIST, { ...E_SHAPE, wristY: 0.25 }, FIST),
+  nobody:     twoFrame(O_SHAPE, FIST, { ...O_SHAPE, wristZ: 0.35 }, FIST),
+  nowhere:    twoFrame(O_SHAPE, FIST, { ...O_SHAPE, wristZ: 0.35 }, FIST),
+  'a lot':   animSign([
+    { right: S_SHAPE, left: S_SHAPE, face: NEUTRAL_FACE, holdMs: 240 },
+    { right: OPEN5,   left: OPEN5,   face: NEUTRAL_FACE, holdMs: 420 },
+  ]),
+  'a little': twoFrame(G_SHAPE, G_SHAPE, { ...G_SHAPE, wristY: 0.25 }, { ...G_SHAPE, wristY: -0.25 }),
+  lots: animSign([
+    { right: S_SHAPE, left: S_SHAPE, face: NEUTRAL_FACE, holdMs: 240 },
+    { right: OPEN5, left: OPEN5, face: NEUTRAL_FACE, holdMs: 420 },
+  ]),
+
+  // ── Core Social / Conversational Verbs ───────────────────
+  // MISS: index curls under chin and slides forward (longing)
+  miss: animSign([
+    { right: atPos(POINT_UP, AT_CHIN, 0.03, +0.03), left: FIST, face: SAD_FACE, holdMs: 280 },
+    { right: { ...atPos(POINT_UP, AT_CHIN, 0.03, +0.03), wristX: 0.22 }, left: FIST, face: SAD_FACE, holdMs: 420 },
+  ]),
+  hate: animSign([
+    { right: { ...D_SHAPE, posX: +0.06, posZ: 0.06 }, left: { ...D_SHAPE, posX: -0.06, posZ: 0.06 }, face: { ...ANGRY_FACE, eyebrowRaise: -0.4 }, holdMs: 280 },
+    { right: { ...D_SHAPE, posX: +0.14, posZ: 0.06, wristZ:  0.30 }, left: { ...D_SHAPE, posX: -0.14, posZ: 0.06, wristZ: -0.30 }, face: { ...ANGRY_FACE, eyebrowRaise: -0.4 }, holdMs: 420 },
+  ]),
+  dislike: animSign([
+    { right: POINT_UP, left: FIST, face: { ...NEUTRAL_FACE, eyebrowRaise: -0.2 }, holdMs: 280 },
+    { right: { ...POINT_UP, wristZ: -0.40 }, left: FIST, face: { ...NEUTRAL_FACE, eyebrowRaise: -0.2 }, holdMs: 420 },
+  ]),
+  enjoy: animSign([
+    { right: FLAT_B, left: FLAT_B, face: HAPPY_FACE, holdMs: 280 },
+    { right: { ...FLAT_B, wristZ: 0.28 }, left: { ...FLAT_B, wristZ: -0.28 }, face: HAPPY_FACE, holdMs: 420 },
+  ]),
+  // WISH: W-hand circular motion on chest
+  wish: animSign([
+    { right: atPos(W_SHAPE, AT_CHEST, 0.06), left: FIST, face: { ...NEUTRAL_FACE, eyebrowRaise: 0.2 }, holdMs: 280 },
+    { right: { ...atPos(W_SHAPE, AT_CHEST + 0.05, 0.06), wristX: 0.18 }, left: FIST, face: { ...NEUTRAL_FACE, eyebrowRaise: 0.2 }, holdMs: 420 },
+  ]),
+  // WONDER: W/circular at temple
+  wonder: animSign([
+    { right: atPos(W_SHAPE, AT_TEMPLE, 0.01, +0.07), left: FIST, face: { ...NEUTRAL_FACE, eyebrowRaise: 0.3 }, holdMs: 260 },
+    { right: { ...atPos(W_SHAPE, AT_TEMPLE, 0.01, +0.07), wristZ: 0.25 }, left: FIST, face: { ...NEUTRAL_FACE, eyebrowRaise: 0.3 }, holdMs: 260 },
+    { right: atPos(W_SHAPE, AT_TEMPLE, 0.01, +0.07), left: FIST, face: { ...NEUTRAL_FACE, eyebrowRaise: 0.3 }, holdMs: 260 },
+  ]),
+  // AGREE: index at temple, then both hands point together
+  agree: animSign([
+    { right: atPos(POINT_UP, AT_TEMPLE, 0.01, +0.06), left: FIST, face: NEUTRAL_FACE, holdMs: 260 },
+    { right: { ...POINT_UP, posX: +0.06 }, left: POINT_UP, face: NEUTRAL_FACE, holdMs: 440 },
+  ]),
+  disagree: animSign([
+    { right: { ...POINT_UP, posX: +0.06 }, left: POINT_UP, face: { ...NEUTRAL_FACE, eyebrowRaise: -0.2 }, holdMs: 280 },
+    { right: { ...POINT_UP, posX: +0.06, wristZ: -0.35 }, left: POINT_UP, face: { ...NEUTRAL_FACE, eyebrowRaise: -0.2 }, holdMs: 420 },
+  ]),
+  // EXPLAIN: flat hands alternately brush forward from body
+  explain: animSign([
+    { right: FLAT_B, left: FLAT_B, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...FLAT_B, wristZ:  0.30 }, left: { ...FLAT_B, wristZ: -0.30 }, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: FLAT_B, left: FLAT_B, face: NEUTRAL_FACE, holdMs: 280 },
+  ]),
+  // MEAN (verb): V-hand twists on open palm → "what it means"
+  mean: animSign([
+    { right: V_SHAPE, left: FLAT_B, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...V_SHAPE, wristX: 0.35 }, left: FLAT_B, face: NEUTRAL_FACE, holdMs: 420 },
+  ]),
+  matter: repeated(M_SHAPE, FIST, { ...M_SHAPE, wristZ: 0.20 }, FIST),
+  care:   repeated(K_SHAPE, FIST, { ...K_SHAPE, wristZ: 0.20 }, FIST),
+  // MIND: M-hand taps forehead
+  mind: animSign([
+    { right: atPos(M_SHAPE, AT_TEMPLE, 0.01, +0.06), left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...atPos(M_SHAPE, AT_TEMPLE, 0.01, +0.06), wristZ: 0.14 }, left: FIST, face: NEUTRAL_FACE, holdMs: 400 },
+  ]),
+  opinion: twoFrame(O_SHAPE, FIST, { ...O_SHAPE, wristZ: 0.30 }, FIST),
+  // REPEAT: R hand circles back to palm (common clarification sign)
+  repeat: animSign([
+    { right: CURVED, left: FLAT_B, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...FLAT_B, wristX: -0.25 }, left: FLAT_B, face: NEUTRAL_FACE, holdMs: 420 },
+  ]),
+  'please repeat': animSign([
+    { right: atPos(FLAT_B, AT_CHEST, 0.07), left: FIST, face: { ...NEUTRAL_FACE, mouthSmile: 0.3 }, holdMs: 280 },
+    { right: { ...atPos(FLAT_B, AT_CHEST, 0.07), wristZ: 0.30 }, left: FIST, face: { ...NEUTRAL_FACE, mouthSmile: 0.3 }, holdMs: 240 },
+    { right: CURVED, left: FLAT_B, face: { ...NEUTRAL_FACE, mouthSmile: 0.3 }, holdMs: 240 },
+    { right: { ...FLAT_B, wristX: -0.25 }, left: FLAT_B, face: { ...NEUTRAL_FACE, mouthSmile: 0.3 }, holdMs: 360 },
+  ]),
+  'slow down': animSign([
+    { right: FLAT_B, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...FLAT_B, wristX: 0.20 }, left: FIST, face: NEUTRAL_FACE, holdMs: 560 },
+  ]),
+  slower: animSign([
+    { right: FLAT_B, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...FLAT_B, wristX: 0.20 }, left: FIST, face: NEUTRAL_FACE, holdMs: 560 },
+  ]),
+
+  // ── Key Action Verbs (gap-fill) ───────────────────────────
+  happen: animSign([
+    { right: POINT_UP, left: POINT_UP, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...POINT_UP, wristX: 0.40 }, left: { ...POINT_UP, wristX: 0.40 }, face: NEUTRAL_FACE, holdMs: 420 },
+  ]),
+  stay:    staticSign(Y_SHAPE, FIST, NEUTRAL_FACE, 700),
+  hold:    twoFrame(S_SHAPE, S_SHAPE, { ...S_SHAPE, wristX: 0.20 }, S_SHAPE),
+  follow:  twoFrame(A_SHAPE, A_SHAPE, { ...A_SHAPE, wristZ: 0.30 }, { ...A_SHAPE, wristZ: 0.30 }),
+  join:    twoFrame(CURVED, CURVED, { ...CURVED, wristZ: 0.30 }, { ...CURVED, wristZ: -0.30 }),
+  fix:     repeated(X_SHAPE, FIST, { ...X_SHAPE, wristZ: 0.22 }, FIST),
+  break:   animSign([
+    { right: S_SHAPE, left: S_SHAPE, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...S_SHAPE, wristZ:  0.50 }, left: { ...S_SHAPE, wristZ: -0.50 }, face: NEUTRAL_FACE, holdMs: 420 },
+  ]),
+  catch:   twoFrame(OPEN5, FIST, FIST, FIST),
+  turn:    repeated(T_SHAPE, FIST, { ...T_SHAPE, wristY: 0.50 }, FIST),
+  fall:    animSign([
+    { right: V_SHAPE, left: FLAT_B, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...V_SHAPE, wristX: 0.40 }, left: FLAT_B, face: NEUTRAL_FACE, holdMs: 420 },
+  ]),
+  include: twoFrame(FLAT_O, FLAT_B, { ...FLAT_O, wristX: -0.30 }, FLAT_B),
+  exclude: twoFrame(FLAT_O, FLAT_B, { ...FLAT_O, wristX:  0.30 }, FLAT_B),
+  compare: twoFrame(FLAT_B, FLAT_B, { ...FLAT_B, wristZ: -0.30 }, FLAT_B),
+  accept:  twoFrame(OPEN5, OPEN5, FIST, FIST),
+  invite:  twoFrame(FLAT_B, FIST, { ...FLAT_B, wristX: -0.25 }, FIST),
+  introduce: twoFrame(FLAT_B, FLAT_B, { ...FLAT_B, wristZ: 0.30 }, { ...FLAT_B, wristZ: -0.30 }),
+  describe: animSign([
+    { right: D_SHAPE, left: FLAT_B, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...D_SHAPE, wristZ:  0.30 }, left: { ...D_SHAPE, wristZ: -0.30 }, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: D_SHAPE, left: FLAT_B, face: NEUTRAL_FACE, holdMs: 280 },
+  ]),
+  check: repeated(X_SHAPE, FLAT_B, { ...X_SHAPE, wristX: 0.22 }, FLAT_B),
+  pass:  twoFrame(FLAT_B, FLAT_B, { ...FLAT_B, wristY: 0.35 }, FLAT_B),
+
+  // ── Senses (missing) ─────────────────────────────────────
+  // SMELL: A-hand sweeps up from nose area
+  smell: animSign([
+    { right: atPos(A_SHAPE, AT_NOSE, 0.02), left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...atPos(A_SHAPE, AT_NOSE + 0.05, 0.03), wristX: -0.15 }, left: FIST, face: NEUTRAL_FACE, holdMs: 420 },
+  ]),
+  // TOUCH: bent middle finger touches back of other hand
+  touch: twoFrame(FEEL_HP, FLAT_B, { ...FEEL_HP, wristX: 0.22 }, FLAT_B),
+  // TASTE: bent middle finger taps lip
+  taste: animSign([
+    { right: atPos(FEEL_HP, AT_MOUTH, 0.02), left: FIST, face: { ...NEUTRAL_FACE, mouthOpen: 0.2 }, holdMs: 280 },
+    { right: { ...atPos(FEEL_HP, AT_MOUTH, 0.02), wristX: 0.15 }, left: FIST, face: { ...NEUTRAL_FACE, mouthOpen: 0.2 }, holdMs: 420 },
+  ]),
+
+  // ── Important Nouns (missing) ─────────────────────────────
+  // IDEA: I-hand flicks outward from forehead (like a light bulb)
+  idea: animSign([
+    { right: atPos(I_SHAPE, AT_FOREHEAD, 0.01, +0.05), left: FIST, face: { ...NEUTRAL_FACE, eyebrowRaise: 0.4 }, holdMs: 280 },
+    { right: { ...I_SHAPE, wristX: -0.22, posX: +0.08, posY: AT_FOREHEAD + 0.04, posZ: 0.05 }, left: FIST, face: { ...NEUTRAL_FACE, eyebrowRaise: 0.4 }, holdMs: 440 },
+  ]),
+  // PROBLEM: bent-V hands twist together
+  problem: animSign([
+    { right: { ...V_SHAPE, posX: +0.06 }, left: { ...V_SHAPE, posX: -0.06 }, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...V_SHAPE, posX: +0.06, wristX: 0.30 }, left: { ...V_SHAPE, posX: -0.06, wristX: 0.30 }, face: NEUTRAL_FACE, holdMs: 420 },
+  ]),
+  trouble: animSign([
+    { right: { ...V_SHAPE, posX: +0.06 }, left: { ...V_SHAPE, posX: -0.06 }, face: { ...NEUTRAL_FACE, eyebrowRaise: -0.2 }, holdMs: 280 },
+    { right: { ...V_SHAPE, posX: +0.06, wristX: 0.30 }, left: { ...V_SHAPE, posX: -0.06, wristX: 0.30 }, face: { ...NEUTRAL_FACE, eyebrowRaise: -0.2 }, holdMs: 420 },
+  ]),
+  thing:  twoFrame(T_SHAPE, FIST, { ...T_SHAPE, wristZ: 0.30 }, FIST),
+  things: twoFrame(T_SHAPE, FIST, { ...T_SHAPE, wristZ: 0.30 }, FIST),
+  // PLACE: P-hands make a circle and return (like tracing a space)
+  place: animSign([
+    { right: FINGERSPELLING.P, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...FINGERSPELLING.P, wristZ: 0.50 }, left: FIST, face: NEUTRAL_FACE, holdMs: 420 },
+  ]),
+  // WAY / PATH: W-hands sweep forward together
+  way:  twoFrame(W_SHAPE, W_SHAPE, { ...W_SHAPE, wristZ: 0.30 }, { ...W_SHAPE, wristZ: 0.30 }),
+  path: twoFrame(FLAT_B, FLAT_B, { ...FLAT_B, wristZ: 0.35 }, { ...FLAT_B, wristZ: 0.35 }),
+  // LIFE: L-hands brush up sides of body (from waist)
+  life: animSign([
+    { right: L_SHAPE, left: L_SHAPE, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...L_SHAPE, wristX: -0.30 }, left: { ...L_SHAPE, wristX: -0.30 }, face: NEUTRAL_FACE, holdMs: 420 },
+  ]),
+  // REASON: R-hand circles at temple then moves outward
+  reason: animSign([
+    { right: atPos(R_SHAPE, AT_TEMPLE, 0.01, +0.07), left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...R_SHAPE, wristZ: 0.30 }, left: FIST, face: NEUTRAL_FACE, holdMs: 420 },
+  ]),
+  plan:    twoFrame(FLAT_B, FLAT_B, { ...FLAT_B, wristZ: 0.35 }, { ...FLAT_B, wristZ: 0.35 }),
+  goal:    repeated(G_SHAPE, FIST, { ...G_SHAPE, wristZ: 0.30 }, FIST),
+  purpose: twoFrame(FINGERSPELLING.P, FIST, { ...FINGERSPELLING.P, wristZ: 0.30 }, FIST),
+  // GROUP: C-hands circle forward and outward
+  group: animSign([
+    { right: C_SHAPE, left: C_SHAPE, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...C_SHAPE, wristZ:  0.45 }, left: { ...C_SHAPE, wristZ: -0.45 }, face: NEUTRAL_FACE, holdMs: 420 },
+  ]),
+  // AGE: A-hand strokes down from chin (chin-to-chest)
+  age: animSign([
+    { right: atPos(A_SHAPE, AT_CHIN, 0.03, +0.03), left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...atPos(A_SHAPE, AT_JAW, 0.04, +0.03), wristX: 0.20 }, left: FIST, face: NEUTRAL_FACE, holdMs: 420 },
+  ]),
+  'how old': animSign([
+    { right: CURVED, left: CURVED, face: WH_QUESTION_FACE, holdMs: 260 },
+    { right: FLAT_B, left: FLAT_B, face: WH_QUESTION_FACE, holdMs: 260 },
+    { right: atPos(A_SHAPE, AT_CHIN, 0.03, +0.03), left: FIST, face: WH_QUESTION_FACE, holdMs: 360 },
+  ]),
+  birthday: animSign([
+    { right: atPos(FEEL_HP, AT_MOUTH, 0.02, +0.02), left: FIST, face: HAPPY_FACE, holdMs: 240 },
+    { right: { ...atPos(FEEL_HP, AT_MOUTH, 0.02, +0.02), wristX: 0.14 }, left: FIST, face: HAPPY_FACE, holdMs: 240 },
+    { right: OPEN5, left: OPEN5, face: HAPPY_FACE, holdMs: 380 },
+  ]),
+  job:   repeated(S_SHAPE, S_SHAPE, { ...S_SHAPE, wristX: 0.20 }, S_SHAPE),
+  hobby: repeated(H_SHAPE, FIST,    { ...H_SHAPE, wristZ: 0.25 }, FIST),
+  sense: animSign([
+    { right: atPos(FEEL_HP, AT_CHEST, 0.07), left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...atPos(FEEL_HP, AT_CHEST + 0.05, 0.07), wristX: 0.10 }, left: FIST, face: NEUTRAL_FACE, holdMs: 420 },
+  ]),
+  couple: animSign([
+    { right: CURVED, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: CURVED, left: CURVED, face: NEUTRAL_FACE, holdMs: 440 },
+  ]),
+  adult: twoFrame(A_SHAPE, FIST, { ...A_SHAPE, wristX: 0.22 }, FIST),
+
+  // ── Time / Scheduling (gap-fill) ─────────────────────────
+  weekend: animSign([
+    { right: W_SHAPE, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...W_SHAPE, wristZ: 0.35 }, left: FIST, face: NEUTRAL_FACE, holdMs: 420 },
+  ]),
+  holiday: animSign([
+    { right: H_SHAPE, left: FIST, face: HAPPY_FACE, holdMs: 280 },
+    { right: { ...H_SHAPE, wristZ: 0.30 }, left: FIST, face: HAPPY_FACE, holdMs: 420 },
+  ]),
+  vacation: animSign([
+    { right: V_SHAPE, left: FIST, face: HAPPY_FACE, holdMs: 280 },
+    { right: { ...V_SHAPE, wristX: -0.22 }, left: FIST, face: HAPPY_FACE, holdMs: 420 },
+  ]),
+  appointment: animSign([
+    { right: A_SHAPE, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...A_SHAPE, wristZ: 0.30 }, left: FIST, face: NEUTRAL_FACE, holdMs: 420 },
+  ]),
+  schedule: repeated(S_SHAPE, FLAT_B, { ...S_SHAPE, wristZ: 0.25 }, FLAT_B),
+  'what time': animSign([
+    { right: FLAT_B, left: FIST, face: WH_QUESTION_FACE, holdMs: 260 },
+    { right: { ...FLAT_B, wristX: 0.20 }, left: FIST, face: WH_QUESTION_FACE, holdMs: 260 },
+    { right: POINT_UP, left: FIST, face: WH_QUESTION_FACE, holdMs: 380 },
+  ]),
+  'right now': repeated(Y_SHAPE, Y_SHAPE, { ...Y_SHAPE, wristX: 0.22 }, { ...Y_SHAPE, wristX: 0.22 }),
+
+  // ── Adjectives (gap-fill) ─────────────────────────────────
+  // NICE: standalone (flat hand brushes over other flat hand)
+  nice: twoFrame(FLAT_B, FLAT_B, { ...FLAT_B, wristZ: 0.30 }, FLAT_B, HAPPY_FACE),
+  // SMART: index at temple, flicks forward and up
+  smart: animSign([
+    { right: atPos(POINT_UP, AT_TEMPLE, 0.01, +0.06), left: FIST, face: { ...NEUTRAL_FACE, eyebrowRaise: 0.2 }, holdMs: 280 },
+    { right: { ...POINT_UP, wristX: -0.22, posX: +0.10, posY: AT_TEMPLE + 0.03, posZ: 0.04 }, left: FIST, face: { ...NEUTRAL_FACE, eyebrowRaise: 0.2 }, holdMs: 440 },
+  ]),
+  stupid: animSign([
+    { right: atPos(S_SHAPE, AT_FOREHEAD, 0.01, +0.04), left: FIST, face: { ...NEUTRAL_FACE, mouthSmile: -0.2 }, holdMs: 280 },
+    { right: { ...atPos(S_SHAPE, AT_FOREHEAD, 0.01, +0.04), wristX: 0.20 }, left: FIST, face: { ...NEUTRAL_FACE, mouthSmile: -0.2 }, holdMs: 420 },
+  ]),
+  // CRAZY: claw at temple, small circles
+  crazy: animSign([
+    { right: atPos(CLAW, AT_TEMPLE, 0.01, +0.07), left: FIST, face: SURPRISED_FACE, holdMs: 260 },
+    { right: { ...atPos(CLAW, AT_TEMPLE, 0.01, +0.07), wristZ: 0.30 }, left: FIST, face: SURPRISED_FACE, holdMs: 260 },
+    { right: atPos(CLAW, AT_TEMPLE, 0.01, +0.07), left: FIST, face: SURPRISED_FACE, holdMs: 260 },
+  ]),
+  strange: animSign([
+    { right: C_SHAPE, left: FIST, face: WH_QUESTION_FACE, holdMs: 280 },
+    { right: { ...C_SHAPE, wristZ: -0.40 }, left: FIST, face: WH_QUESTION_FACE, holdMs: 420 },
+  ]),
+  weird: animSign([
+    { right: C_SHAPE, left: FIST, face: WH_QUESTION_FACE, holdMs: 280 },
+    { right: { ...C_SHAPE, wristZ: -0.40 }, left: FIST, face: WH_QUESTION_FACE, holdMs: 420 },
+  ]),
+  interesting: animSign([
+    { right: CURVED, left: FIST, face: { ...NEUTRAL_FACE, eyebrowRaise: 0.3 }, holdMs: 280 },
+    { right: { ...CURVED, wristX: -0.20 }, left: FIST, face: { ...NEUTRAL_FACE, eyebrowRaise: 0.3 }, holdMs: 420 },
+  ]),
+  boring: animSign([
+    { right: atPos(POINT_UP, AT_NOSE, 0.01), left: FIST, face: { ...NEUTRAL_FACE, mouthSmile: -0.3, eyeSquint: 0.2 }, holdMs: 280 },
+    { right: { ...atPos(POINT_UP, AT_NOSE, 0.01), wristZ: -0.30 }, left: FIST, face: { ...NEUTRAL_FACE, mouthSmile: -0.3, eyeSquint: 0.2 }, holdMs: 420 },
+  ]),
+  serious: animSign([
+    { right: atPos(S_SHAPE, AT_CHIN, 0.03, +0.03), left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...atPos(S_SHAPE, AT_CHIN, 0.03, +0.03), wristZ: 0.20 }, left: FIST, face: NEUTRAL_FACE, holdMs: 420 },
+  ]),
+  kind:    repeated(K_SHAPE, FLAT_B, { ...K_SHAPE, wristZ: 0.25 }, FLAT_B, HAPPY_FACE),
+  honest:  animSign([
+    { right: H_SHAPE, left: FLAT_B, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...H_SHAPE, wristZ: 0.30 }, left: FLAT_B, face: NEUTRAL_FACE, holdMs: 420 },
+  ]),
+  polite:  repeated(FINGERSPELLING.P, FLAT_B, { ...FINGERSPELLING.P, wristX: 0.20 }, FLAT_B, HAPPY_FACE),
+  strong:  twoFrame(S_SHAPE, FIST, { ...S_SHAPE, wristX: -0.25 }, FIST),
+  weak:    twoFrame(W_SHAPE, FIST, { ...W_SHAPE, wristX:  0.20 }, FIST),
+  brave:   twoFrame(S_SHAPE, S_SHAPE, { ...S_SHAPE, wristX: -0.30 }, S_SHAPE),
+  // SWEET: U-fingers brush down chin
+  sweet: animSign([
+    { right: atPos(U_SHAPE, AT_CHIN, 0.02, +0.03), left: FIST, face: HAPPY_FACE, holdMs: 280 },
+    { right: { ...atPos(U_SHAPE, AT_JAW, 0.03, +0.03), wristX: 0.18 }, left: FIST, face: HAPPY_FACE, holdMs: 420 },
+  ]),
+  lucky:   repeated(L_SHAPE, FIST, { ...L_SHAPE, wristX: -0.20 }, FIST, HAPPY_FACE),
+  // DEFINITELY: flat B-hand firm downward motion
+  definitely: animSign([
+    { right: FLAT_B, left: FIST, face: { ...NEUTRAL_FACE, eyebrowRaise: 0.1 }, holdMs: 280 },
+    { right: { ...FLAT_B, wristX: 0.30 }, left: FIST, face: { ...NEUTRAL_FACE, eyebrowRaise: 0.1 }, holdMs: 420 },
+  ]),
+  exactly: twoFrame(X_SHAPE, FIST, { ...X_SHAPE, wristX: 0.28 }, FIST, { ...NEUTRAL_FACE, eyebrowRaise: 0.1 }),
+  finally: animSign([
+    { right: F_SHAPE, left: F_SHAPE, face: { ...NEUTRAL_FACE, eyebrowRaise: 0.2 }, holdMs: 280 },
+    { right: { ...F_SHAPE, wristZ:  0.35 }, left: { ...F_SHAPE, wristZ: -0.35 }, face: { ...NEUTRAL_FACE, eyebrowRaise: 0.2 }, holdMs: 420 },
+  ]),
+  therefore: twoFrame(T_SHAPE, FIST, { ...T_SHAPE, wristZ: 0.30 }, FIST),
+
+  // ── Personal / Relationship Info (gap-fill) ───────────────
+  married: animSign([
+    { right: CURVED, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: CURVED, left: CURVED, face: NEUTRAL_FACE, holdMs: 440 },
+  ]),
+  single: animSign([
+    { right: S_SHAPE, left: FIST, face: NEUTRAL_FACE, holdMs: 260 },
+    { right: { ...S_SHAPE, wristZ: 0.35 }, left: FIST, face: NEUTRAL_FACE, holdMs: 260 },
+    { right: S_SHAPE, left: FIST, face: NEUTRAL_FACE, holdMs: 260 },
+  ]),
+  boyfriend: animSign([
+    { right: FLAT_B, left: FIST, face: NEUTRAL_FACE, holdMs: 240 },
+    { right: { ...FLAT_B, wristX: 0.22 }, left: FIST, face: NEUTRAL_FACE, holdMs: 240 },
+    { right: CURVED, left: CURVED, face: NEUTRAL_FACE, holdMs: 380 },
+  ]),
+  girlfriend: animSign([
+    { right: A_SHAPE, left: FIST, face: NEUTRAL_FACE, holdMs: 240 },
+    { right: { ...A_SHAPE, wristX: -0.22 }, left: FIST, face: NEUTRAL_FACE, holdMs: 240 },
+    { right: CURVED, left: CURVED, face: NEUTRAL_FACE, holdMs: 380 },
+  ]),
+  cousin: repeated(C_SHAPE, FIST, { ...C_SHAPE, wristZ: 0.30 }, FIST),
+  aunt:   twoFrame(A_SHAPE, FIST, { ...A_SHAPE, wristZ: -0.30 }, FIST),
+  uncle:  repeated(U_SHAPE, FIST, { ...U_SHAPE, wristZ: 0.25 }, FIST),
+  relative: repeated(R_SHAPE, FIST, { ...R_SHAPE, wristZ: 0.28 }, FIST),
+  partner:  twoFrame(CURVED, CURVED, { ...CURVED, wristZ: 0.35 }, { ...CURVED, wristZ: -0.35 }),
+
+  // ── Common Conversational Phrases (gap-fill) ──────────────
+  'never mind': animSign([
+    { right: OPEN5, left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...OPEN5, wristZ: -0.50 }, left: FIST, face: NEUTRAL_FACE, holdMs: 420 },
+  ]),
+  'of course': animSign([
+    { right: S_SHAPE, left: FIST, face: { ...NEUTRAL_FACE, mouthSmile: 0.2 }, holdMs: 280 },
+    { right: { ...S_SHAPE, wristZ: 0.35 }, left: FIST, face: { ...NEUTRAL_FACE, mouthSmile: 0.2 }, holdMs: 420 },
+  ]),
+  'no problem': animSign([
+    { right: FINGERSPELLING.N, left: FIST, face: NEUTRAL_FACE, holdMs: 240 },
+    { right: FINGERSPELLING.O, left: FIST, face: NEUTRAL_FACE, holdMs: 240 },
+    { right: { ...V_SHAPE, posX: +0.06 }, left: { ...V_SHAPE, posX: -0.06 }, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...V_SHAPE, posX: +0.06, wristX: 0.30 }, left: { ...V_SHAPE, posX: -0.06, wristX: 0.30 }, face: NEUTRAL_FACE, holdMs: 360 },
+  ]),
+  'i understand': animSign([
+    { right: POINT_UP, left: FIST, face: NEUTRAL_FACE, holdMs: 240 },
+    { right: atPos(POINT_UP, AT_FOREHEAD, 0.01, +0.04), left: FIST, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...atPos(POINT_UP, AT_FOREHEAD, 0.01, +0.04), wristX: 0.30 }, left: FIST, face: NEUTRAL_FACE, holdMs: 380 },
+  ]),
+  "i don't understand": animSign([
+    { right: POINT_UP, left: FIST, face: WH_QUESTION_FACE, holdMs: 240 },
+    { right: atPos(POINT_UP, AT_FOREHEAD, 0.01, +0.04), left: FIST, face: WH_QUESTION_FACE, holdMs: 280 },
+    { right: { ...atPos(POINT_UP, AT_FOREHEAD, 0.01, +0.04), wristZ: -0.40 }, left: FIST, face: WH_QUESTION_FACE, holdMs: 400 },
+  ]),
+  "don't understand": animSign([
+    { right: atPos(POINT_UP, AT_FOREHEAD, 0.01, +0.04), left: FIST, face: WH_QUESTION_FACE, holdMs: 280 },
+    { right: { ...atPos(POINT_UP, AT_FOREHEAD, 0.01, +0.04), wristZ: -0.40 }, left: FIST, face: WH_QUESTION_FACE, holdMs: 420 },
+  ]),
+  'wait a moment': animSign([
+    { right: OPEN5, left: OPEN5, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...OPEN5, wristZ: 0.15 }, left: { ...OPEN5, wristZ: -0.15 }, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...POINT_UP, thumb: { flex: 0.72, abd: 0 } }, left: FIST, face: NEUTRAL_FACE, holdMs: 400 },
+  ]),
+  'hold on': animSign([
+    { right: OPEN5, left: OPEN5, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...OPEN5, wristZ: 0.15 }, left: { ...OPEN5, wristZ: -0.15 }, face: NEUTRAL_FACE, holdMs: 440 },
+  ]),
+  'what do you mean': animSign([
+    { right: FLAT_B, left: FIST, face: WH_QUESTION_FACE, holdMs: 240 },
+    { right: { ...FLAT_B, wristX: 0.20 }, left: FIST, face: WH_QUESTION_FACE, holdMs: 240 },
+    { right: { ...POINT_UP, wristZ: 0.18 }, left: FIST, face: WH_QUESTION_FACE, holdMs: 240 },
+    { right: V_SHAPE, left: FLAT_B, face: WH_QUESTION_FACE, holdMs: 360 },
+  ]),
+  'i miss you': animSign([
+    { right: POINT_UP, left: FIST, face: SAD_FACE, holdMs: 240 },
+    { right: atPos(POINT_UP, AT_CHIN, 0.03, +0.03), left: FIST, face: SAD_FACE, holdMs: 280 },
+    { right: { ...atPos(POINT_UP, AT_CHIN, 0.03, +0.03), wristX: 0.22 }, left: FIST, face: SAD_FACE, holdMs: 240 },
+    { right: { ...POINT_UP, wristZ: 0.18 }, left: FIST, face: SAD_FACE, holdMs: 380 },
+  ]),
+  "that's fine": animSign([
+    { right: POINT_UP, left: FIST, face: { ...NEUTRAL_FACE, mouthSmile: 0.2 }, holdMs: 280 },
+    { right: F_SHAPE, left: FIST, face: { ...NEUTRAL_FACE, mouthSmile: 0.2 }, holdMs: 420 },
+  ]),
+  'that is okay': animSign([
+    { right: O_SHAPE, left: FIST, face: { ...NEUTRAL_FACE, mouthSmile: 0.2 }, holdMs: 300 },
+    { right: POINT_UP, left: FIST, face: { ...NEUTRAL_FACE, mouthSmile: 0.2 }, holdMs: 420 },
+  ]),
+  "i'm fine": animSign([
+    { right: POINT_UP, left: FIST, face: HAPPY_FACE, holdMs: 240 },
+    { right: F_SHAPE, left: FIST, face: HAPPY_FACE, holdMs: 420 },
+  ]),
+  "i'm good": animSign([
+    { right: POINT_UP, left: FIST, face: HAPPY_FACE, holdMs: 240 },
+    { right: atPos(FLAT_B, AT_CHIN, 0.02, +0.04), left: FIST, face: HAPPY_FACE, holdMs: 280 },
+    { right: { ...atPos(FLAT_B, AT_CHIN - 0.06, 0.12), wristX: 0.22 }, left: FLAT_B, face: HAPPY_FACE, holdMs: 380 },
+  ]),
+  "what's your name": animSign([
+    { right: FLAT_B, left: FIST, face: WH_QUESTION_FACE, holdMs: 240 },
+    { right: { ...FLAT_B, wristX: 0.20 }, left: FIST, face: WH_QUESTION_FACE, holdMs: 240 },
+    { right: { ...FLAT_B, wristZ: 0.20 }, left: FIST, face: WH_QUESTION_FACE, holdMs: 240 },
+    { right: { ...H_SHAPE, posX: +0.06 }, left: { ...H_SHAPE, posX: -0.06 }, face: WH_QUESTION_FACE, holdMs: 360 },
+  ]),
+  'my name is': animSign([
+    { right: FLAT_B, left: FIST, face: NEUTRAL_FACE, holdMs: 240 },
+    { right: { ...H_SHAPE, posX: +0.06 }, left: { ...H_SHAPE, posX: -0.06 }, face: NEUTRAL_FACE, holdMs: 280 },
+    { right: { ...H_SHAPE, posX: +0.06, wristX: 0.22 }, left: { ...H_SHAPE, posX: -0.06 }, face: NEUTRAL_FACE, holdMs: 260 },
+    { right: { ...H_SHAPE, posX: +0.06 }, left: { ...H_SHAPE, posX: -0.06 }, face: NEUTRAL_FACE, holdMs: 260 },
+  ]),
+  'where are you from': animSign([
+    { right: POINT_UP, left: FIST, face: WH_QUESTION_FACE, holdMs: 240 },
+    { right: { ...POINT_UP, wristZ: 0.28 }, left: FIST, face: WH_QUESTION_FACE, holdMs: 240 },
+    { right: { ...POINT_UP, wristZ: 0.18 }, left: FIST, face: WH_QUESTION_FACE, holdMs: 240 },
+    { right: FINGERSPELLING.F, left: FIST, face: WH_QUESTION_FACE, holdMs: 360 },
+  ]),
+
+  // ── Additional Common Words ───────────────────────────────
+  fine:    twoFrame(F_SHAPE, FIST, { ...F_SHAPE, wristX: 0.22 }, FIST, HAPPY_FACE),
+  from:    twoFrame(FINGERSPELLING.F, FIST, { ...FINGERSPELLING.F, wristZ: 0.30 }, FIST),
+  since:   twoFrame(POINT_UP, FIST, { ...POINT_UP, wristZ: -0.30 }, FIST),
+  until:   twoFrame(POINT_UP, POINT_UP, { ...POINT_UP, wristZ: 0.30 }, POINT_UP),
+  during:  twoFrame(D_SHAPE, FIST, { ...D_SHAPE, wristZ: 0.30 }, FIST),
+  while:   twoFrame(Y_SHAPE, Y_SHAPE, { ...Y_SHAPE, wristZ: 0.25 }, { ...Y_SHAPE, wristZ: 0.25 }),
+  type:    repeated(T_SHAPE, FIST, { ...T_SHAPE, wristZ: 0.22 }, FIST),
+  sort:    twoFrame(S_SHAPE, FIST, { ...S_SHAPE, wristZ: 0.28 }, FIST),
+  part:    twoFrame(FINGERSPELLING.P, FIST, { ...FINGERSPELLING.P, wristZ: 0.30 }, FIST),
+  through: twoFrame(FLAT_B, V_SHAPE, { ...FLAT_B, wristY: 0.35 }, V_SHAPE),
+  along:   twoFrame(POINT_UP, POINT_UP, { ...POINT_UP, wristZ: 0.35 }, POINT_UP),
+  against: twoFrame(POINT_UP, FLAT_B, { ...POINT_UP, wristX: 0.30 }, FLAT_B),
+  number:  repeated(FINGERSPELLING.N, FIST, { ...FINGERSPELLING.N, wristZ: 0.22 }, FIST),
+  percent: twoFrame(O_SHAPE, FIST, { ...O_SHAPE, wristZ: 0.40 }, FIST),
+  dollar:  repeated(D_SHAPE, FIST, { ...D_SHAPE, wristZ: 0.25 }, FIST),
+  price:   twoFrame(X_SHAPE, FLAT_B, { ...X_SHAPE, wristX: 0.28 }, FLAT_B),
+  total:   twoFrame(T_SHAPE, FIST, { ...T_SHAPE, wristX: 0.30 }, FIST),
+  half:    twoFrame(H_SHAPE, FLAT_B, { ...H_SHAPE, wristZ: 0.30 }, FLAT_B),
+  however: twoFrame(H_SHAPE, FIST, { ...H_SHAPE, wristZ: -0.30 }, FIST),
+
 };
 
 // ============================================================
@@ -1719,6 +2259,66 @@ const IRREGULAR: Record<string, string> = {
   "don't": "don't",
   "doesn't": 'not',
   "didn't": 'not',
+  // to catch
+  caught: 'catch', catches: 'catch', catching: 'catch',
+  // to break
+  broke: 'break', broken: 'break', breaks: 'break', breaking: 'break',
+  // to fall
+  fell: 'fall', fallen: 'fall', falls: 'fall', falling: 'fall',
+  // to hold
+  held: 'hold', holds: 'hold', holding: 'hold',
+  // to mean
+  meant: 'mean', means: 'mean', meaning: 'mean',
+  // to agree
+  agreed: 'agree', agrees: 'agree', agreeing: 'agree',
+  // to disagree
+  disagreed: 'disagree', disagrees: 'disagree',
+  // to miss
+  missed: 'miss', misses: 'miss', missing: 'miss',
+  // to hate
+  hated: 'hate', hates: 'hate', hating: 'hate',
+  // to enjoy
+  enjoyed: 'enjoy', enjoys: 'enjoy', enjoying: 'enjoy',
+  // to wish
+  wished: 'wish', wishes: 'wish', wishing: 'wish',
+  // to explain
+  explained: 'explain', explains: 'explain', explaining: 'explain',
+  // to follow
+  followed: 'follow', follows: 'follow', following: 'follow',
+  // to accept
+  accepted: 'accept', accepts: 'accept', accepting: 'accept',
+  // to describe
+  described: 'describe', describes: 'describe', describing: 'describe',
+  // to compare
+  compared: 'compare', compares: 'compare', comparing: 'compare',
+  // to stay
+  stayed: 'stay', stays: 'stay', staying: 'stay',
+  // to happen
+  happened: 'happen', happens: 'happen', happening: 'happen',
+  // to include
+  included: 'include', includes: 'include', including: 'include',
+  // to join
+  joined: 'join', joins: 'join', joining: 'join',
+  // to taste
+  tasted: 'taste', tastes: 'taste', tasting: 'taste',
+  // to wonder
+  wondered: 'wonder', wonders: 'wonder', wondering: 'wonder',
+  // to care
+  cared: 'care', cares: 'care', caring: 'care',
+  // to fix
+  fixed: 'fix', fixes: 'fix', fixing: 'fix',
+  // to check
+  checked: 'check', checks: 'check', checking: 'check',
+  // to turn
+  turned: 'turn', turns: 'turn', turning: 'turn',
+  // to pass
+  passed: 'pass', passes: 'pass', passing: 'pass',
+  // name aliases
+  feelings: 'feel', feeling: 'feel',
+  agreement: 'agree', disagreement: 'disagree',
+  explanation: 'explain', comparison: 'compare',
+  description: 'describe', inclusion: 'include',
+  marriage: 'married', marriages: 'married',
 };
 
 // Suffixes to strip when looking up a word (in order of priority)
