@@ -24,11 +24,12 @@ The project uses a single-repo layout with three top-level directories:
 - **State/Data fetching**: TanStack React Query for server state management
 - **UI Components**: shadcn/ui (new-york style) with Radix UI primitives, Tailwind CSS for styling
 - **Animations**: Framer Motion for UI transitions
-- **3D Rendering**: Three.js with GLTFLoader for the signing avatar
-  - `SignAvatar.tsx` — Main avatar component, manages Three.js scene, camera, renderer
-  - `avatar-model.ts` (`AvatarController` class) — Loads GLTF model, manages bone-based IK for arms/hands, applies hand poses and facial expressions
-  - `three-hand.ts` — Procedural hand mesh generation with capsule/cylinder finger segments and rounded geometry
-  - `asl-poses.ts` — ASL pose dictionary mapping 400+ English words to hand poses with finger curl/spread values, facial expressions, and position offsets. Falls back to fingerspelling for unknown words.
+- **3D Rendering**: Three.js with GLTFLoader + FBXLoader for the signing avatar
+  - `SignAvatar.tsx` — Main avatar component, manages Three.js scene, camera, renderer, animation playback loop
+  - `avatar-model.ts` (`AvatarController` class) — Loads GLTF model (`TalkingHead brunette.glb`, white female, Mixamo skeleton with 67 joints, 72 ARKit morph targets). Manages AnimationMixer for FBX mocap playback, bone-based IK for arms/hands, hand poses, and facial expressions. FBX track names are remapped by stripping `mixamorig:` prefix to match model bones.
+  - `asl-animation.ts` — Word/letter animation URL resolver. Maps words to `/animations/words/{word}.fbx` and letters to `/animations/letters/{LETTER}.fbx`. 10 word animations + 26 letter fingerspelling animations from Studio Galt ASL Mocap Archive (CC0 licensed, Mixamo-compatible).
+  - `asl-poses.ts` — Fallback ASL pose dictionary mapping 400+ English words to hand poses. Used when FBX mocap data is not available for a word.
+  - **Animation pipeline**: Word FBX → pose queue fallback → fingerspell via letter FBXs. Sequential async processing with AbortController for cancellation. Clip caching avoids reloading.
 - **Path aliases**: `@/` maps to `client/src/`, `@shared/` maps to `shared/`
 
 ### Backend (`server/`)
