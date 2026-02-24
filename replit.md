@@ -95,7 +95,8 @@ The app uses a premium dark theme by default with CSS custom properties for all 
 
 ### Third-Party Services
 - **Deepgram** — Real-time speech-to-text via WebSocket
-- **OpenAI (via Replit AI Integrations)** — LLM sentence polishing (gpt-5-mini) and TTS (gpt-audio)
+- **DeepSeek** — LLM sentence polishing (deepseek-chat model) for ASL→English translation
+- **OpenAI (via Replit AI Integrations)** — TTS (gpt-audio) for speaking polished sentences
 - **MediaPipe** — Client-side hand landmark detection for ASL recognition
 - **PostgreSQL** — Primary data store for translation history
 

@@ -60,13 +60,13 @@ export async function registerRoutes(
       const schema = z.object({ words: z.array(z.string()).min(1) });
       const { words } = schema.parse(req.body);
 
-      const openai = new OpenAI({
-        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+      const deepseek = new OpenAI({
+        apiKey: process.env.DEEPSEEK_API_KEY,
+        baseURL: "https://api.deepseek.com",
       });
 
-      const completion = await openai.chat.completions.create({
-        model: "gpt-5-mini",
+      const completion = await deepseek.chat.completions.create({
+        model: "deepseek-chat",
         messages: [
           {
             role: "system",
@@ -77,7 +77,7 @@ export async function registerRoutes(
             content: `ASL signs in order: ${words.join(" ")}`,
           },
         ],
-        max_completion_tokens: 256,
+        max_tokens: 256,
       });
 
       const sentence = completion.choices[0]?.message?.content?.trim() || words.join(" ");
