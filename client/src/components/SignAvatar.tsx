@@ -268,7 +268,6 @@ export function SignAvatar({ currentWord, isRecording, signQueue }: SignAvatarPr
     const av = avatarRef.current;
     if (!av) return;
 
-    av.stopAnimation();
     poseQueueRef.current   = [];
     currentItemRef.current = null;
 
@@ -311,6 +310,10 @@ export function SignAvatar({ currentWord, isRecording, signQueue }: SignAvatarPr
 
         if (ac.signal.aborted) return;
       }
+
+      if (!ac.signal.aborted) {
+        av.restoreToIdle();
+      }
     })();
   }, [signQueue]);
 
@@ -318,7 +321,10 @@ export function SignAvatar({ currentWord, isRecording, signQueue }: SignAvatarPr
     if (!isRecording) {
       if (abortRef.current) abortRef.current.abort();
       const av = avatarRef.current;
-      if (av) av.stopAnimation();
+      if (av) {
+        av.stopAnimation();
+        av.restoreToIdle();
+      }
       poseQueueRef.current   = [];
       currentItemRef.current = null;
     }

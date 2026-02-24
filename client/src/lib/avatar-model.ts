@@ -423,18 +423,17 @@ export class AvatarController {
     return false;
   }
 
-  async loadAndPlayAnimation(url: string): Promise<void> {
-    if (!this.mixer) return;
+  private _loadClip(url: string): Promise<THREE.AnimationClip | null> {
+    const cached = this.clipCache.get(url);
+    if (cached) return Promise.resolve(cached);
 
-    let clip = this.clipCache.get(url);
-    if (!clip) {
-      const fbxLoader = new FBXLoader();
-      const fbxGroup = await fbxLoader.loadAsync(url);
+    const fbxLoader = new FBXLoader();
+    return fbxLoader.loadAsync(url).then(fbxGroup => {
       if (!fbxGroup.animations.length) {
         console.warn('No animations found in', url);
-        return;
+        return null;
       }
-      clip = fbxGroup.animations[0];
+      const clip = fbxGroup.animations[0];
       clip.tracks = clip.tracks
         .map(track => {
           track.name = track.name.replace(/^mixamorig:?/, '');
@@ -446,25 +445,48 @@ export class AvatarController {
           return this._isSigningBone(boneName);
         });
       this.clipCache.set(url, clip);
-    }
+      return clip;
+    });
+  }
 
-    this.stopAnimation();
+  private static readonly CROSSFADE_DUR = 0.3;
+
+  async loadAndPlayAnimation(url: string): Promise<void> {
+    if (!this.mixer) return;
+
+    const clip = await this._loadClip(url);
+    if (!clip) return;
+
+    const prevAction = this.currentAction;
 
     const action = this.mixer.clipAction(clip);
     action.setLoop(THREE.LoopOnce, 1);
     action.clampWhenFinished = false;
-    action.fadeIn(0.25);
     action.reset();
+
+    if (prevAction && prevAction.isRunning()) {
+      action.fadeIn(AvatarController.CROSSFADE_DUR);
+      prevAction.fadeOut(AvatarController.CROSSFADE_DUR);
+    } else {
+      action.fadeIn(0.2);
+    }
+
     action.play();
     this.currentAction = action;
     this._animationPlaying = true;
+
+    if (prevAction && prevAction !== action) {
+      setTimeout(() => {
+        prevAction.stop();
+        this.mixer?.uncacheAction(prevAction.getClip());
+      }, AvatarController.CROSSFADE_DUR * 1000 + 50);
+    }
 
     return new Promise<void>((resolve) => {
       const onFinished = (e: { action: THREE.AnimationAction }) => {
         if (e.action === action) {
           this.mixer?.removeEventListener('finished', onFinished);
           this._animationPlaying = false;
-          this._restoreAfterAnimation();
           resolve();
         }
       };
@@ -476,6 +498,11 @@ export class AvatarController {
     this.mixer?.update(deltaSeconds);
   }
 
+  restoreToIdle() {
+    this._restoreAfterAnimation();
+    this._applyIdlePose(1);
+  }
+
   stopAnimation() {
     if (this.currentAction) {
       this.currentAction.stop();
@@ -483,9 +510,9 @@ export class AvatarController {
         this.mixer.uncacheAction(this.currentAction.getClip());
       }
       this.currentAction = null;
-      this._restoreAfterAnimation();
     }
     this._animationPlaying = false;
+    this._restoreAfterAnimation();
   }
 
   isAnimationPlaying(): boolean {
