@@ -206,7 +206,7 @@ export function SignAvatar({ currentWord, isRecording, signQueue }: SignAvatarPr
                 currentItemRef.current = null;
               }
             } else {
-              const idleT = Math.min(dt / 220, 1);
+              const idleT = Math.min(dt / 120, 1);
               av.applySway(now);
               av.applyHandPose('right', IDLE_RIGHT, idleT);
               av.applyHandPose('left', IDLE_LEFT, idleT);

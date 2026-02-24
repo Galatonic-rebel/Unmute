@@ -146,10 +146,10 @@ export class AvatarController {
 
       const sign = side === 'left' ? 1 : -1;
       const armDown = new THREE.Quaternion().setFromEuler(
-        new THREE.Euler(0.18, 0, sign * 0.82)
+        new THREE.Euler(0.12, 0, sign * 1.35)
       );
       const forearmBend = new THREE.Quaternion().setFromEuler(
-        new THREE.Euler(0.15, 0, sign * 0.05)
+        new THREE.Euler(0.08, 0, sign * 0.04)
       );
 
       this.idleArmQuats[side].arm = armRestQ.clone().multiply(armDown);
@@ -431,6 +431,7 @@ export class AvatarController {
         .filter(track => {
           if (track.name.endsWith('.position')) return false;
           if (track.name.endsWith('.scale')) return false;
+          if (track.name.startsWith('Hips.')) return false;
           return true;
         });
       this.clipCache.set(url, clip);
