@@ -43,3 +43,6 @@ waitForPort = 5000
 
 [userenv.shared]
 DEEPGRAM_API_KEY = "4590bf20d72e5322e1324970a2fb2e261fcb62c4"
+
+[agent]
+integrations = ["javascript_openai_ai_integrations:2.0.0"]

@@ -1,11 +1,20 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useSpeech } from '@/hooks/use-speech';
+import { useSignDetection } from '@/hooks/use-sign-detection';
 import { SignAvatar } from '@/components/SignAvatar';
-import { Mic, Square, Loader2, AlertCircle, Hand } from 'lucide-react';
+import { CameraFeed } from '@/components/CameraFeed';
+import { Mic, Square, Loader2, AlertCircle, Hand, Camera, ArrowLeftRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import bgImage from '@assets/image_1771963051387.png';
 
+type AppMode = 'speech-to-sign' | 'sign-to-speech';
+
 export default function Home() {
+  const [mode, setMode] = useState<AppMode>('speech-to-sign');
+  const [polishedSentence, setPolishedSentence] = useState('');
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [signError, setSignError] = useState<string | null>(null);
+
   const {
     isRecording,
     isConnecting,
@@ -13,28 +22,100 @@ export default function Home() {
     finalResult,
     currentWord,
     newFinalWords,
-    error,
+    error: speechError,
     startRecording,
     stopRecording,
-    reset,
+    reset: resetSpeech,
   } = useSpeech();
 
-  const signQueueRef = useRef<string[]>([]);
+  const {
+    isDetecting,
+    recognizedWords,
+    currentSign,
+    landmarks,
+    videoRef,
+    startDetection,
+    stopDetection,
+    reset: resetDetection,
+  } = useSignDetection();
 
-  useEffect(() => {
-    if (newFinalWords.length > 0) {
-      signQueueRef.current = [...newFinalWords];
-    }
-  }, [newFinalWords]);
+  const handleToggleMode = useCallback(() => {
+    if (isRecording || isConnecting) stopRecording();
+    if (isDetecting) stopDetection();
+    setPolishedSentence('');
+    setSignError(null);
+    resetSpeech();
+    resetDetection();
+    setMode((prev) => (prev === 'speech-to-sign' ? 'sign-to-speech' : 'speech-to-sign'));
+  }, [isRecording, isConnecting, isDetecting, stopRecording, stopDetection, resetSpeech, resetDetection]);
 
-  const handleToggleRecording = () => {
-    if (isRecording || isConnecting) {
-      stopRecording();
+  const handleToggleAction = useCallback(async () => {
+    if (mode === 'speech-to-sign') {
+      if (isRecording || isConnecting) {
+        stopRecording();
+      } else {
+        resetSpeech();
+        startRecording();
+      }
     } else {
-      reset();
-      startRecording();
+      if (isDetecting) {
+        stopDetection();
+      } else {
+        setSignError(null);
+        try {
+          await startDetection();
+        } catch (err) {
+          setSignError(err instanceof Error ? err.message : 'Could not access camera');
+        }
+      }
     }
-  };
+  }, [mode, isRecording, isConnecting, isDetecting, stopRecording, resetSpeech, startRecording, stopDetection, startDetection]);
+
+  const handleSpeak = useCallback(async () => {
+    if (recognizedWords.length === 0 || isSpeaking) return;
+    setIsSpeaking(true);
+    try {
+      const polishRes = await fetch('/api/polish-sentence', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ words: recognizedWords }),
+      });
+      if (!polishRes.ok) throw new Error('Failed to polish sentence');
+      const { sentence } = await polishRes.json();
+      setPolishedSentence(sentence);
+
+      const ttsRes = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: sentence, voice: 'nova' }),
+      });
+      if (!ttsRes.ok) throw new Error('Failed to generate speech');
+
+      const audioBlob = await ttsRes.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+      const audio = new Audio(audioUrl);
+      audio.onended = () => {
+        setIsSpeaking(false);
+        URL.revokeObjectURL(audioUrl);
+      };
+      audio.onerror = () => {
+        setIsSpeaking(false);
+        URL.revokeObjectURL(audioUrl);
+      };
+      await audio.play();
+    } catch (err) {
+      console.error('Speak error:', err);
+      setIsSpeaking(false);
+    }
+  }, [recognizedWords, isSpeaking]);
+
+  const handleResetDetection = useCallback(() => {
+    resetDetection();
+    setPolishedSentence('');
+  }, [resetDetection]);
+
+  const error = mode === 'speech-to-sign' ? speechError : signError;
+  const isActive = mode === 'speech-to-sign' ? (isRecording || isConnecting) : isDetecting;
 
   return (
     <div className="fixed inset-0 overflow-auto">
@@ -56,22 +137,39 @@ export default function Home() {
               </h1>
             </div>
           </div>
-          <div className="hidden sm:flex items-center gap-2 text-xs text-white/40 tracking-wide">
-            <span className="px-3 py-1.5 rounded-full bg-white/5 border border-white/10 backdrop-blur-sm">
-              Speech → ASL
-            </span>
-          </div>
+          <button
+            onClick={handleToggleMode}
+            className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 border border-white/20 backdrop-blur-sm text-white/80 hover:bg-white/20 hover:text-white transition-all duration-200 text-xs tracking-wide"
+            data-testid="button-toggle-mode"
+          >
+            <ArrowLeftRight className="w-3.5 h-3.5" />
+            {mode === 'speech-to-sign' ? 'Speech → ASL' : 'ASL → Speech'}
+          </button>
         </header>
 
         <main className="flex-1 flex flex-col items-center justify-center px-4 md:px-8 pb-6 gap-5">
           <div className="w-full max-w-4xl">
-            <SignAvatar
-              currentWord={currentWord}
-              isRecording={isRecording}
-              signQueue={newFinalWords.length > 0 ? newFinalWords : undefined}
-              finalResult={finalResult}
-              interimResult={interimResult}
-            />
+            {mode === 'speech-to-sign' ? (
+              <SignAvatar
+                currentWord={currentWord}
+                isRecording={isRecording}
+                signQueue={newFinalWords.length > 0 ? newFinalWords : undefined}
+                finalResult={finalResult}
+                interimResult={interimResult}
+              />
+            ) : (
+              <CameraFeed
+                isDetecting={isDetecting}
+                currentSign={currentSign}
+                recognizedWords={recognizedWords}
+                landmarks={landmarks}
+                polishedSentence={polishedSentence}
+                isSpeaking={isSpeaking}
+                onSpeak={handleSpeak}
+                onReset={handleResetDetection}
+                videoRef={videoRef as React.RefObject<HTMLVideoElement>}
+              />
+            )}
           </div>
 
           <div className="flex flex-col items-center gap-3">
@@ -91,43 +189,60 @@ export default function Home() {
             </AnimatePresence>
 
             <button
-              onClick={handleToggleRecording}
+              onClick={handleToggleAction}
               disabled={isConnecting}
-              data-testid="toggle-recording-button"
+              data-testid="toggle-action-button"
               className={`
                 group relative flex items-center justify-center gap-3 px-8 py-4 rounded-full font-bold text-lg transition-all duration-300 backdrop-blur-sm
-                ${isRecording
+                ${isActive
                   ? 'bg-red-500/20 text-red-200 border-2 border-red-400/50 hover:bg-red-500/30'
                   : 'bg-white/15 text-white border-2 border-white/25 hover:bg-white/25 hover:border-white/40 hover:-translate-y-1 shadow-lg shadow-black/20'
                 }
                 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none
               `}
             >
-              {isConnecting ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Connecting…
-                </>
-              ) : isRecording ? (
+              {mode === 'speech-to-sign' ? (
+                isConnecting ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Connecting…
+                  </>
+                ) : isRecording ? (
+                  <>
+                    <Square className="w-5 h-5 fill-current" />
+                    Stop Translating
+                  </>
+                ) : (
+                  <>
+                    <Mic className="w-5 h-5" />
+                    Start Translating
+                  </>
+                )
+              ) : isDetecting ? (
                 <>
                   <Square className="w-5 h-5 fill-current" />
-                  Stop Translating
+                  Stop Detecting
                 </>
               ) : (
                 <>
-                  <Mic className="w-5 h-5" />
-                  Start Translating
+                  <Camera className="w-5 h-5" />
+                  Start Detecting
                 </>
               )}
 
-              {isRecording && (
+              {isActive && (
                 <span className="absolute inset-0 rounded-full animate-pulse-glow pointer-events-none -z-10" />
               )}
             </button>
 
-            {isRecording && (
+            {mode === 'speech-to-sign' && isRecording && (
               <p className="text-xs text-white/40 text-center">
                 Speak naturally — the avatar will sign each word in real-time
+              </p>
+            )}
+            {mode === 'sign-to-speech' && isDetecting && (
+              <p className="text-xs text-white/40 text-center">
+                Show ASL signs to the camera — detected signs will appear as text
               </p>
             )}
           </div>
