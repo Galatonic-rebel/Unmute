@@ -146,10 +146,10 @@ export class AvatarController {
 
       const sign = side === 'left' ? 1 : -1;
       const armDown = new THREE.Quaternion().setFromEuler(
-        new THREE.Euler(0.15, 0, sign * 0.04)
+        new THREE.Euler(0.10, 0, sign * 0.02)
       );
       const forearmBend = new THREE.Quaternion().setFromEuler(
-        new THREE.Euler(0.08, 0, 0)
+        new THREE.Euler(0.05, 0, 0)
       );
 
       this.idleArmQuats[side].arm = armRestQ.clone().multiply(armDown);
@@ -507,11 +507,21 @@ export class AvatarController {
       if (!chain) continue;
       const sign = side === 'left' ? 1 : -1;
 
-      const armSpread = new THREE.Quaternion().setFromEuler(
-        new THREE.Euler(0, 0, sign * -0.35)
+      chain.arm.updateWorldMatrix(true, false);
+
+      const parentWorldQ = new THREE.Quaternion();
+      if (chain.arm.parent) chain.arm.parent.getWorldQuaternion(parentWorldQ);
+
+      const worldSpread = new THREE.Quaternion().setFromAxisAngle(
+        new THREE.Vector3(0, 0, -1),
+        sign * 0.25
       );
-      const spreadArmQ = chain.arm.quaternion.clone().multiply(armSpread);
-      chain.arm.quaternion.slerp(spreadArmQ, 0.7);
+
+      const currentWorldQ = parentWorldQ.clone().multiply(chain.arm.quaternion);
+      const spreadWorldQ = worldSpread.clone().multiply(currentWorldQ);
+      const newLocalQ = parentWorldQ.clone().invert().multiply(spreadWorldQ);
+
+      chain.arm.quaternion.slerp(newLocalQ, 0.8);
     }
   }
 
