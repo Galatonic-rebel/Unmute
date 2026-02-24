@@ -143,7 +143,7 @@ export class AvatarController {
       if (!shoulderRestQ) continue;
 
       const spread = new THREE.Quaternion().setFromEuler(
-        new THREE.Euler(0, 0, sign * -0.12)
+        new THREE.Euler(0, 0, sign * -0.22)
       );
       const newQ = shoulderRestQ.clone().multiply(spread);
       chain.shoulder.quaternion.copy(newQ);
@@ -469,7 +469,7 @@ export class AvatarController {
     });
   }
 
-  private static readonly CROSSFADE_DUR = 0.3;
+  private static readonly CROSSFADE_DUR = 0.45;
 
   async loadAndPlayAnimation(url: string): Promise<void> {
     if (!this.mixer) return;
@@ -493,7 +493,7 @@ export class AvatarController {
     action.setLoop(THREE.LoopOnce, 1);
     action.clampWhenFinished = false;
     action.reset();
-    action.fadeIn(prevAction && prevAction.isRunning() ? AvatarController.CROSSFADE_DUR : 0.2);
+    action.fadeIn(prevAction && prevAction.isRunning() ? AvatarController.CROSSFADE_DUR : 0.35);
     action.play();
 
     this.currentAction = action;
