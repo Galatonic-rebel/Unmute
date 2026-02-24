@@ -491,9 +491,9 @@ export class AvatarController {
     this.mixer.uncacheAction(clip);
     const action = this.mixer.clipAction(clip);
     action.setLoop(THREE.LoopOnce, 1);
-    action.clampWhenFinished = false;
+    action.clampWhenFinished = true;
     action.reset();
-    action.fadeIn(prevAction && prevAction.isRunning() ? AvatarController.CROSSFADE_DUR : 0.35);
+    action.fadeIn(prevAction ? AvatarController.CROSSFADE_DUR : 0.35);
     action.play();
 
     this.currentAction = action;
