@@ -140,7 +140,7 @@ export function SignAvatar({ currentWord, isRecording, signQueue }: SignAvatarPr
         }
 
         avatar.root.scale.setScalar(0.765);
-        avatar.root.position.y = -0.80;
+        avatar.root.position.y = -0.70;
         avatar.root.position.z = 0.02;
         scene.add(avatar.root);
         avatarRef.current = avatar;
