@@ -42,6 +42,7 @@ export function SignAvatar({ currentWord, isRecording, signQueue }: SignAvatarPr
   const nextBlinkRef        = useRef<number>(2800 + Math.random() * 3000);
   const prevSignQueueRef    = useRef<string[] | undefined>(undefined);
   const abortRef            = useRef<AbortController | null>(null);
+  const signingRef          = useRef<boolean>(false);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -205,6 +206,8 @@ export function SignAvatar({ currentWord, isRecording, signQueue }: SignAvatarPr
               if (now - itemStartRef.current >= cur.holdMs) {
                 currentItemRef.current = null;
               }
+            } else if (signingRef.current) {
+              av.applySway(now);
             } else {
               const idleT = Math.min(dt / 120, 1);
               av.applySway(now);
@@ -270,10 +273,11 @@ export function SignAvatar({ currentWord, isRecording, signQueue }: SignAvatarPr
 
     poseQueueRef.current   = [];
     currentItemRef.current = null;
+    signingRef.current     = true;
 
     (async () => {
       for (const word of signQueue) {
-        if (ac.signal.aborted) return;
+        if (ac.signal.aborted) break;
 
         const lower = word.toLowerCase().trim();
         if (!lower) continue;
@@ -296,7 +300,7 @@ export function SignAvatar({ currentWord, isRecording, signQueue }: SignAvatarPr
             await waitMs(totalMs + 200, ac.signal);
           } else {
             for (const letter of lower) {
-              if (ac.signal.aborted) return;
+              if (ac.signal.aborted) break;
               if (/[a-z]/.test(letter)) {
                 try {
                   await av.loadAndPlayAnimation(getLetterAnimationUrl(letter));
@@ -308,9 +312,10 @@ export function SignAvatar({ currentWord, isRecording, signQueue }: SignAvatarPr
           }
         }
 
-        if (ac.signal.aborted) return;
+        if (ac.signal.aborted) break;
       }
 
+      signingRef.current = false;
       if (!ac.signal.aborted) {
         av.restoreToIdle();
       }
@@ -320,6 +325,7 @@ export function SignAvatar({ currentWord, isRecording, signQueue }: SignAvatarPr
   useEffect(() => {
     if (!isRecording) {
       if (abortRef.current) abortRef.current.abort();
+      signingRef.current = false;
       const av = avatarRef.current;
       if (av) {
         av.stopAnimation();
