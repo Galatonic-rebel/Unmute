@@ -126,10 +126,30 @@ export class AvatarController {
 
     this.mixer = new THREE.AnimationMixer(model);
 
+    this._spreadShoulders();
     this._computeIdlePose();
     this._applyIdlePose(1);
 
     this._loaded = true;
+  }
+
+  private _spreadShoulders() {
+    for (const side of ['left', 'right'] as const) {
+      const chain = this.armChains[side];
+      if (!chain) continue;
+      const sign = side === 'left' ? 1 : -1;
+
+      const shoulderRestQ = this.restQuats.get(chain.shoulder.name);
+      if (!shoulderRestQ) continue;
+
+      const spread = new THREE.Quaternion().setFromEuler(
+        new THREE.Euler(0, 0, sign * -0.12)
+      );
+      const newQ = shoulderRestQ.clone().multiply(spread);
+      chain.shoulder.quaternion.copy(newQ);
+
+      this.restQuats.set(chain.shoulder.name, newQ.clone());
+    }
   }
 
   private _computeIdlePose() {
@@ -459,28 +479,25 @@ export class AvatarController {
 
     const prevAction = this.currentAction;
 
+    if (prevAction) {
+      prevAction.fadeOut(AvatarController.CROSSFADE_DUR);
+      const prevClip = prevAction.getClip();
+      setTimeout(() => {
+        prevAction.stop();
+        this.mixer?.uncacheAction(prevClip);
+      }, AvatarController.CROSSFADE_DUR * 1000 + 50);
+    }
+
+    this.mixer.uncacheAction(clip);
     const action = this.mixer.clipAction(clip);
     action.setLoop(THREE.LoopOnce, 1);
     action.clampWhenFinished = false;
     action.reset();
-
-    if (prevAction && prevAction.isRunning()) {
-      action.fadeIn(AvatarController.CROSSFADE_DUR);
-      prevAction.fadeOut(AvatarController.CROSSFADE_DUR);
-    } else {
-      action.fadeIn(0.2);
-    }
-
+    action.fadeIn(prevAction && prevAction.isRunning() ? AvatarController.CROSSFADE_DUR : 0.2);
     action.play();
+
     this.currentAction = action;
     this._animationPlaying = true;
-
-    if (prevAction && prevAction !== action) {
-      setTimeout(() => {
-        prevAction.stop();
-        this.mixer?.uncacheAction(prevAction.getClip());
-      }, AvatarController.CROSSFADE_DUR * 1000 + 50);
-    }
 
     return new Promise<void>((resolve) => {
       const onFinished = (e: { action: THREE.AnimationAction }) => {
