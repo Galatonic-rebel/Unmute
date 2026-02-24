@@ -110,6 +110,13 @@ export function useSpeech() {
         }
       });
 
+      connection.on(LiveTranscriptionEvents.UtteranceEnd, () => {
+        setTimeout(() => {
+          setFinalResult('');
+          setInterimResult('');
+        }, 1500);
+      });
+
       connection.on(LiveTranscriptionEvents.Error, (err) => {
         console.error('Deepgram error:', err);
         setError('Lost connection to transcription service.');
