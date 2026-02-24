@@ -1,14 +1,26 @@
 import {
   HandLandmarker,
+  PoseLandmarker,
+  FaceLandmarker,
   FilesetResolver,
   type NormalizedLandmark,
 } from "@mediapipe/tasks-vision";
-import type { HandPose } from "./asl-poses";
+import type { HandPose, FaceExpression } from "./asl-poses";
+
+export interface HandRelativePos {
+  posX: number;
+  posY: number;
+  posZ: number;
+}
 
 export interface DetectionResult {
   left: HandPose | null;
   right: HandPose | null;
   landmarks: NormalizedLandmark[][] | null;
+  rightHandPos: HandRelativePos | null;
+  leftHandPos: HandRelativePos | null;
+  detectedFace: FaceExpression | null;
+  bodyLandmarks: NormalizedLandmark[] | null;
 }
 
 const LANDMARK = {
@@ -35,6 +47,18 @@ const LANDMARK = {
   PINKY_TIP: 20,
 } as const;
 
+const POSE_LANDMARK = {
+  NOSE: 0,
+  LEFT_SHOULDER: 11,
+  RIGHT_SHOULDER: 12,
+  LEFT_ELBOW: 13,
+  RIGHT_ELBOW: 14,
+  LEFT_WRIST: 15,
+  RIGHT_WRIST: 16,
+  LEFT_HIP: 23,
+  RIGHT_HIP: 24,
+} as const;
+
 type Vec3 = { x: number; y: number; z: number };
 
 function sub(a: Vec3, b: Vec3): Vec3 {
@@ -53,12 +77,12 @@ function cross(a: Vec3, b: Vec3): Vec3 {
   };
 }
 
-function length(v: Vec3): number {
+function vlength(v: Vec3): number {
   return Math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
 }
 
 function normalize(v: Vec3): Vec3 {
-  const len = length(v);
+  const len = vlength(v);
   if (len < 1e-8) return { x: 0, y: 0, z: 0 };
   return { x: v.x / len, y: v.y / len, z: v.z / len };
 }
@@ -153,67 +177,18 @@ function computeWristRotation(lm: NormalizedLandmark[]): {
 }
 
 function landmarksToHandPose(lm: NormalizedLandmark[]): HandPose {
-  const indexCurl = computeFingerCurl(
-    lm,
-    LANDMARK.INDEX_MCP,
-    LANDMARK.INDEX_PIP,
-    LANDMARK.INDEX_DIP,
-    LANDMARK.INDEX_TIP,
-  );
-  const middleCurl = computeFingerCurl(
-    lm,
-    LANDMARK.MIDDLE_MCP,
-    LANDMARK.MIDDLE_PIP,
-    LANDMARK.MIDDLE_DIP,
-    LANDMARK.MIDDLE_TIP,
-  );
-  const ringCurl = computeFingerCurl(
-    lm,
-    LANDMARK.RING_MCP,
-    LANDMARK.RING_PIP,
-    LANDMARK.RING_DIP,
-    LANDMARK.RING_TIP,
-  );
-  const pinkyCurl = computeFingerCurl(
-    lm,
-    LANDMARK.PINKY_MCP,
-    LANDMARK.PINKY_PIP,
-    LANDMARK.PINKY_DIP,
-    LANDMARK.PINKY_TIP,
-  );
+  const indexCurl = computeFingerCurl(lm, LANDMARK.INDEX_MCP, LANDMARK.INDEX_PIP, LANDMARK.INDEX_DIP, LANDMARK.INDEX_TIP);
+  const middleCurl = computeFingerCurl(lm, LANDMARK.MIDDLE_MCP, LANDMARK.MIDDLE_PIP, LANDMARK.MIDDLE_DIP, LANDMARK.MIDDLE_TIP);
+  const ringCurl = computeFingerCurl(lm, LANDMARK.RING_MCP, LANDMARK.RING_PIP, LANDMARK.RING_DIP, LANDMARK.RING_TIP);
+  const pinkyCurl = computeFingerCurl(lm, LANDMARK.PINKY_MCP, LANDMARK.PINKY_PIP, LANDMARK.PINKY_DIP, LANDMARK.PINKY_TIP);
 
-  const indexSpread = computeFingerSpread(
-    lm,
-    LANDMARK.INDEX_MCP,
-    LANDMARK.MIDDLE_MCP,
-    LANDMARK.WRIST,
-    true,
-  );
-  const middleSpread = computeFingerSpread(
-    lm,
-    LANDMARK.MIDDLE_MCP,
-    LANDMARK.RING_MCP,
-    LANDMARK.WRIST,
-    false,
-  );
-  const ringSpread = computeFingerSpread(
-    lm,
-    LANDMARK.RING_MCP,
-    LANDMARK.PINKY_MCP,
-    LANDMARK.WRIST,
-    false,
-  );
-  const pinkySpread = computeFingerSpread(
-    lm,
-    LANDMARK.PINKY_MCP,
-    LANDMARK.RING_MCP,
-    LANDMARK.WRIST,
-    false,
-  );
+  const indexSpread = computeFingerSpread(lm, LANDMARK.INDEX_MCP, LANDMARK.MIDDLE_MCP, LANDMARK.WRIST, true);
+  const middleSpread = computeFingerSpread(lm, LANDMARK.MIDDLE_MCP, LANDMARK.RING_MCP, LANDMARK.WRIST, false);
+  const ringSpread = computeFingerSpread(lm, LANDMARK.RING_MCP, LANDMARK.PINKY_MCP, LANDMARK.WRIST, false);
+  const pinkySpread = computeFingerSpread(lm, LANDMARK.PINKY_MCP, LANDMARK.RING_MCP, LANDMARK.WRIST, false);
 
   const thumbFlex = computeThumbFlex(lm);
   const thumbAbd = computeThumbAbduction(lm);
-
   const { wristX, wristY, wristZ } = computeWristRotation(lm);
 
   return {
@@ -228,30 +203,146 @@ function landmarksToHandPose(lm: NormalizedLandmark[]): HandPose {
   };
 }
 
+function computeHandRelativePos(
+  handWrist: NormalizedLandmark,
+  bodyLandmarks: NormalizedLandmark[],
+): HandRelativePos {
+  const lShoulder = bodyLandmarks[POSE_LANDMARK.LEFT_SHOULDER];
+  const rShoulder = bodyLandmarks[POSE_LANDMARK.RIGHT_SHOULDER];
+  const nose = bodyLandmarks[POSE_LANDMARK.NOSE];
+  const lHip = bodyLandmarks[POSE_LANDMARK.LEFT_HIP];
+  const rHip = bodyLandmarks[POSE_LANDMARK.RIGHT_HIP];
+
+  const shoulderMidX = (lShoulder.x + rShoulder.x) / 2;
+  const shoulderMidY = (lShoulder.y + rShoulder.y) / 2;
+  const shoulderWidth = Math.abs(lShoulder.x - rShoulder.x);
+  const scale = shoulderWidth > 0.01 ? shoulderWidth : 0.2;
+
+  const hipMidY = (lHip.y + rHip.y) / 2;
+  const noseY = nose.y;
+  const bodyHeight = hipMidY - noseY;
+
+  const handY = handWrist.y;
+  const relativeHeight = (shoulderMidY - handY) / (bodyHeight > 0.05 ? bodyHeight : 0.3);
+
+  const AT_REST = -0.08;
+  const FACE_TOP = 0.72;
+  const posY = AT_REST + relativeHeight * (FACE_TOP - AT_REST);
+
+  const lateralOffset = (shoulderMidX - handWrist.x) / scale;
+  const posX = lateralOffset * 0.15;
+
+  const shoulderMidZ = ((lShoulder as any).z ?? 0 + (rShoulder as any).z ?? 0) / 2;
+  const handZ = (handWrist as any).z ?? 0;
+  const depthDiff = shoulderMidZ - handZ;
+  const posZ = depthDiff * 0.3;
+
+  return { posX, posY, posZ };
+}
+
+function extractFaceExpression(
+  blendShapes: Array<{ categoryName: string; score: number }>,
+): FaceExpression {
+  const get = (name: string): number => {
+    const entry = blendShapes.find((b) => b.categoryName === name);
+    return entry ? entry.score : 0;
+  };
+
+  const browInnerUp = get("browInnerUp");
+  const browOuterUpL = get("browOuterUpLeft");
+  const browOuterUpR = get("browOuterUpRight");
+  const browDownL = get("browDownLeft");
+  const browDownR = get("browDownRight");
+  const browUp = (browInnerUp + browOuterUpL + browOuterUpR) / 3;
+  const browDown = (browDownL + browDownR) / 2;
+  const eyebrowRaise = browUp > 0.15 ? browUp : browDown > 0.15 ? -browDown : 0;
+
+  const jawOpen = get("jawOpen");
+  const mouthOpen = Math.min(1, jawOpen * 1.5);
+
+  const smileL = get("mouthSmileLeft");
+  const smileR = get("mouthSmileRight");
+  const frownL = get("mouthFrownLeft");
+  const frownR = get("mouthFrownRight");
+  const smile = (smileL + smileR) / 2;
+  const frown = (frownL + frownR) / 2;
+  const mouthSmile = smile > 0.15 ? smile : frown > 0.15 ? -frown : 0;
+
+  const cheekPuffL = get("cheekPuff");
+  const cheekPuff = cheekPuffL;
+
+  const squintL = get("eyeSquintLeft");
+  const squintR = get("eyeSquintRight");
+  const eyeSquint = (squintL + squintR) / 2;
+
+  return {
+    eyebrowRaise,
+    mouthOpen,
+    mouthSmile,
+    cheekPuff,
+    eyeSquint,
+  };
+}
+
+const VISION_WASM_URL = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm";
+
 export class PoseDetector {
   private handLandmarker: HandLandmarker | null = null;
+  private poseLandmarker: PoseLandmarker | null = null;
+  private faceLandmarker: FaceLandmarker | null = null;
   private lastTimestamp = -1;
 
   async init(_video?: HTMLVideoElement): Promise<void> {
-    const vision = await FilesetResolver.forVisionTasks(
-      "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm",
-    );
+    const vision = await FilesetResolver.forVisionTasks(VISION_WASM_URL);
 
-    this.handLandmarker = await HandLandmarker.createFromOptions(vision, {
-      baseOptions: {
-        modelAssetPath:
-          "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
-        delegate: "GPU",
-      },
-      runningMode: "VIDEO",
-      numHands: 2,
-    });
+    const [hand, pose, face] = await Promise.all([
+      HandLandmarker.createFromOptions(vision, {
+        baseOptions: {
+          modelAssetPath:
+            "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
+          delegate: "GPU",
+        },
+        runningMode: "VIDEO",
+        numHands: 2,
+      }),
+      PoseLandmarker.createFromOptions(vision, {
+        baseOptions: {
+          modelAssetPath:
+            "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task",
+          delegate: "GPU",
+        },
+        runningMode: "VIDEO",
+        numPoses: 1,
+      }),
+      FaceLandmarker.createFromOptions(vision, {
+        baseOptions: {
+          modelAssetPath:
+            "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
+          delegate: "GPU",
+        },
+        runningMode: "VIDEO",
+        numFaces: 1,
+        outputFaceBlendshapes: true,
+      }),
+    ]);
+
+    this.handLandmarker = hand;
+    this.poseLandmarker = pose;
+    this.faceLandmarker = face;
   }
 
   detect(video: HTMLVideoElement): DetectionResult {
-    if (!this.handLandmarker) {
-      return { left: null, right: null, landmarks: null };
-    }
+    const empty: DetectionResult = {
+      left: null,
+      right: null,
+      landmarks: null,
+      rightHandPos: null,
+      leftHandPos: null,
+      detectedFace: null,
+      bodyLandmarks: null,
+    };
+
+    if (!this.handLandmarker) return empty;
 
     let timestamp = performance.now();
     if (timestamp <= this.lastTimestamp) {
@@ -259,36 +350,80 @@ export class PoseDetector {
     }
     this.lastTimestamp = timestamp;
 
-    const result = this.handLandmarker.detectForVideo(video, timestamp);
+    const handResult = this.handLandmarker.detectForVideo(video, timestamp);
 
-    if (
-      !result.landmarks ||
-      result.landmarks.length === 0 ||
-      !result.handednesses ||
-      result.handednesses.length === 0
-    ) {
-      return { left: null, right: null, landmarks: null };
+    let poseResult: any = null;
+    if (this.poseLandmarker) {
+      try {
+        poseResult = this.poseLandmarker.detectForVideo(video, timestamp + 0.1);
+      } catch (_) {}
+    }
+
+    let faceResult: any = null;
+    if (this.faceLandmarker) {
+      try {
+        faceResult = this.faceLandmarker.detectForVideo(video, timestamp + 0.2);
+      } catch (_) {}
     }
 
     let leftPose: HandPose | null = null;
     let rightPose: HandPose | null = null;
+    let leftWristLm: NormalizedLandmark | null = null;
+    let rightWristLm: NormalizedLandmark | null = null;
 
-    for (let i = 0; i < result.landmarks.length; i++) {
-      const lm = result.landmarks[i];
-      const handedness = result.handednesses[i]?.[0]?.categoryName;
-      const pose = landmarksToHandPose(lm);
+    if (
+      handResult.landmarks &&
+      handResult.landmarks.length > 0 &&
+      handResult.handednesses &&
+      handResult.handednesses.length > 0
+    ) {
+      for (let i = 0; i < handResult.landmarks.length; i++) {
+        const lm = handResult.landmarks[i];
+        const handedness = handResult.handednesses[i]?.[0]?.categoryName;
+        const pose = landmarksToHandPose(lm);
 
-      if (handedness === "Left") {
-        rightPose = pose;
-      } else if (handedness === "Right") {
-        leftPose = pose;
+        if (handedness === "Left") {
+          rightPose = pose;
+          rightWristLm = lm[LANDMARK.WRIST];
+        } else if (handedness === "Right") {
+          leftPose = pose;
+          leftWristLm = lm[LANDMARK.WRIST];
+        }
       }
+    }
+
+    const bodyLandmarks: NormalizedLandmark[] | null =
+      poseResult?.landmarks?.[0] ?? null;
+
+    let rightHandPos: HandRelativePos | null = null;
+    let leftHandPos: HandRelativePos | null = null;
+
+    if (bodyLandmarks && bodyLandmarks.length >= 25) {
+      if (rightWristLm) {
+        rightHandPos = computeHandRelativePos(rightWristLm, bodyLandmarks);
+      }
+      if (leftWristLm) {
+        leftHandPos = computeHandRelativePos(leftWristLm, bodyLandmarks);
+      }
+    }
+
+    let detectedFace: FaceExpression | null = null;
+    if (
+      faceResult?.faceBlendshapes &&
+      faceResult.faceBlendshapes.length > 0 &&
+      faceResult.faceBlendshapes[0]?.categories
+    ) {
+      detectedFace = extractFaceExpression(faceResult.faceBlendshapes[0].categories);
     }
 
     return {
       left: leftPose,
       right: rightPose,
-      landmarks: result.landmarks,
+      landmarks: handResult.landmarks?.length > 0 ? handResult.landmarks : null,
+      rightHandPos,
+      leftHandPos,
+      detectedFace,
+      bodyLandmarks,
     };
   }
 
@@ -296,6 +431,14 @@ export class PoseDetector {
     if (this.handLandmarker) {
       this.handLandmarker.close();
       this.handLandmarker = null;
+    }
+    if (this.poseLandmarker) {
+      this.poseLandmarker.close();
+      this.poseLandmarker = null;
+    }
+    if (this.faceLandmarker) {
+      this.faceLandmarker.close();
+      this.faceLandmarker = null;
     }
   }
 }

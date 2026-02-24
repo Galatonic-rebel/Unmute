@@ -2,12 +2,14 @@ import { useEffect, useRef, useCallback } from 'react';
 import { Volume2, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
+import type { NormalizedLandmark } from '@mediapipe/tasks-vision';
 
 interface CameraFeedProps {
   isDetecting: boolean;
   currentSign: string | null;
   recognizedWords: string[];
-  landmarks: any;
+  landmarks: NormalizedLandmark[][] | null;
+  bodyLandmarks: NormalizedLandmark[] | null;
   polishedSentence: string;
   isSpeaking: boolean;
   onSpeak: () => void;
@@ -24,11 +26,20 @@ const HAND_CONNECTIONS = [
   [5, 9], [9, 13], [13, 17],
 ];
 
+const BODY_CONNECTIONS = [
+  [11, 12],
+  [11, 13], [13, 15],
+  [12, 14], [14, 16],
+  [11, 23], [12, 24],
+  [23, 24],
+];
+
 export function CameraFeed({
   isDetecting,
   currentSign,
   recognizedWords,
   landmarks,
+  bodyLandmarks,
   polishedSentence,
   isSpeaking,
   onSpeak,
@@ -38,7 +49,7 @@ export function CameraFeed({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rafRef = useRef<number>(0);
 
-  const drawLandmarks = useCallback(() => {
+  const drawOverlay = useCallback(() => {
     const canvas = canvasRef.current;
     const video = videoRef.current;
     if (!canvas || !video) return;
@@ -55,18 +66,12 @@ export function CameraFeed({
 
     ctx.clearRect(0, 0, w, h);
 
-    if (!landmarks) return;
-
-    const hands = Array.isArray(landmarks) ? landmarks : [landmarks];
-
-    for (const hand of hands) {
-      if (!hand || !Array.isArray(hand) || hand.length < 21) continue;
-
-      ctx.strokeStyle = 'cyan';
+    if (bodyLandmarks && bodyLandmarks.length >= 25) {
+      ctx.strokeStyle = 'rgba(255, 200, 50, 0.6)';
       ctx.lineWidth = 2;
-      for (const [a, b] of HAND_CONNECTIONS) {
-        const p1 = hand[a];
-        const p2 = hand[b];
+      for (const [a, b] of BODY_CONNECTIONS) {
+        const p1 = bodyLandmarks[a];
+        const p2 = bodyLandmarks[b];
         if (!p1 || !p2) continue;
         const x1 = (1 - p1.x) * w;
         const y1 = p1.y * h;
@@ -78,28 +83,77 @@ export function CameraFeed({
         ctx.stroke();
       }
 
-      ctx.fillStyle = '#22c55e';
-      for (const pt of hand) {
+      ctx.fillStyle = 'rgba(255, 200, 50, 0.5)';
+      const bodyPoints = [11, 12, 13, 14, 15, 16, 23, 24];
+      for (const idx of bodyPoints) {
+        const pt = bodyLandmarks[idx];
         if (!pt) continue;
         const x = (1 - pt.x) * w;
         const y = pt.y * h;
         ctx.beginPath();
-        ctx.arc(x, y, 4, 0, Math.PI * 2);
+        ctx.arc(x, y, 3, 0, Math.PI * 2);
         ctx.fill();
       }
+
+      const nose = bodyLandmarks[0];
+      if (nose) {
+        ctx.strokeStyle = 'rgba(100, 200, 255, 0.4)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        const noseX = (1 - nose.x) * w;
+        const noseY = nose.y * h;
+        ctx.beginPath();
+        ctx.arc(noseX, noseY, 30, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
     }
-  }, [landmarks, videoRef]);
+
+    if (landmarks) {
+      const hands = Array.isArray(landmarks) ? landmarks : [landmarks];
+
+      for (const hand of hands) {
+        if (!hand || !Array.isArray(hand) || hand.length < 21) continue;
+
+        ctx.strokeStyle = 'cyan';
+        ctx.lineWidth = 2;
+        for (const [a, b] of HAND_CONNECTIONS) {
+          const p1 = hand[a];
+          const p2 = hand[b];
+          if (!p1 || !p2) continue;
+          const x1 = (1 - p1.x) * w;
+          const y1 = p1.y * h;
+          const x2 = (1 - p2.x) * w;
+          const y2 = p2.y * h;
+          ctx.beginPath();
+          ctx.moveTo(x1, y1);
+          ctx.lineTo(x2, y2);
+          ctx.stroke();
+        }
+
+        ctx.fillStyle = '#22c55e';
+        for (const pt of hand) {
+          if (!pt) continue;
+          const x = (1 - pt.x) * w;
+          const y = pt.y * h;
+          ctx.beginPath();
+          ctx.arc(x, y, 4, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    }
+  }, [landmarks, bodyLandmarks, videoRef]);
 
   useEffect(() => {
     let active = true;
 
     const loop = () => {
       if (!active) return;
-      drawLandmarks();
+      drawOverlay();
       rafRef.current = requestAnimationFrame(loop);
     };
 
-    if (landmarks) {
+    if (landmarks || bodyLandmarks) {
       rafRef.current = requestAnimationFrame(loop);
     } else {
       const canvas = canvasRef.current;
@@ -113,7 +167,7 @@ export function CameraFeed({
       active = false;
       cancelAnimationFrame(rafRef.current);
     };
-  }, [landmarks, drawLandmarks]);
+  }, [landmarks, bodyLandmarks, drawOverlay]);
 
   return (
     <div
@@ -174,7 +228,7 @@ export function CameraFeed({
               variant="ghost"
               onClick={onSpeak}
               disabled={isSpeaking}
-              className="text-white/70 hover-elevate"
+              className="text-white/70"
               data-testid="button-speak"
             >
               <Volume2 />
@@ -183,7 +237,7 @@ export function CameraFeed({
               size="icon"
               variant="ghost"
               onClick={onReset}
-              className="text-white/70 hover-elevate"
+              className="text-white/70"
               data-testid="button-clear"
             >
               <Trash2 />
@@ -218,7 +272,7 @@ export function CameraFeed({
           </div>
         ) : isDetecting ? (
           <p className="text-white/20 text-sm text-center">
-            Show signs to the camera to begin detection
+            Show signs to the camera — hands, arms, and face are all tracked
           </p>
         ) : null}
       </div>

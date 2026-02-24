@@ -42,10 +42,10 @@ The project uses a single-repo layout with three top-level directories:
   - `asl-poses.ts` — ASL pose dictionary mapping 500+ English words to hand poses with keyframe sequences.
   - **Animation pipeline**: Word FBX → pose queue fallback → fingerspell via letter FBXs. ClampWhenFinished holds poses between words. Crossfade duration: 0.45s.
 - **Computer Vision** (ASL → Speech mode):
-  - `pose-detector.ts` — MediaPipe HandLandmarker integration. Converts 21 hand landmarks to HandPose format (finger curl/spread, thumb flex/abd, wrist rotation).
-  - `sign-matcher.ts` — Matches detected hand poses against FINGERSPELLING and WORD_SIGNS dictionaries. Temporal stability (8 frames) + cooldown (12 frames).
-  - `use-sign-detection.ts` — React hook managing webcam stream and detection loop at ~15fps.
-  - `CameraFeed.tsx` — Camera feed component with hand landmark overlay, recognized signs display, speak/clear controls.
+  - `pose-detector.ts` — MediaPipe integration with **three models**: HandLandmarker (21 hand landmarks per hand), PoseLandmarker (33 body landmarks for arm/shoulder/head positions), FaceLandmarker (blend shapes for facial expressions). Computes hand position relative to body (posX/posY/posZ using shoulder midpoint as origin) and maps face blend shapes to FaceExpression interface.
+  - `sign-matcher.ts` — Multi-feature sign matching: handshape distance (35%), position distance (50%), face expression distance (15%). Two-tier matching: first filters by position region (forehead/face/chin/chest/low), then ranks by combined distance. Temporal stability (8 frames) + cooldown (15 frames).
+  - `use-sign-detection.ts` — React hook managing webcam stream and detection loop at ~15fps. Passes full detection result (hand poses + positions + face) to matcher.
+  - `CameraFeed.tsx` — Camera feed component with hand landmark overlay (cyan), body skeleton overlay (yellow), head circle (blue), recognized signs display, speak/clear controls.
 - **Path aliases**: `@/` maps to `client/src/`, `@shared/` maps to `shared/`
 
 ### Backend (`server/`)
@@ -78,9 +78,11 @@ The project uses a single-repo layout with three top-level directories:
 - Movie-style subtitles: cleared on UtteranceEnd event after 1.5s delay
 
 ### Sign Detection Pipeline (ASL → Speech)
-- `use-sign-detection.ts` manages webcam + MediaPipe HandLandmarker
-- Each frame: hand landmarks → HandPose conversion → sign matching against 500+ word dictionary
-- Recognized words accumulate; user taps "Speak" to polish via OpenAI and play TTS
+- `use-sign-detection.ts` manages webcam + MediaPipe HandLandmarker + PoseLandmarker + FaceLandmarker
+- Each frame: hand landmarks → HandPose + body landmarks → hand-relative position + face blend shapes → FaceExpression
+- Sign matching uses combined distance: handshape (35%) + position relative to body (50%) + facial expression (15%)
+- Two-tier matching: first filter by position region, then rank by combined distance
+- Recognized words accumulate; user taps "Speak" to polish via DeepSeek and play TTS via OpenAI
 
 ### Dark Theme
 The app uses a premium dark theme by default with CSS custom properties for all color tokens. No light mode toggle exists.

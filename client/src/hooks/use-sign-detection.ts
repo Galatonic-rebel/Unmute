@@ -11,6 +11,7 @@ export interface UseSignDetectionReturn {
   recognizedWords: string[];
   currentSign: string | null;
   landmarks: NormalizedLandmark[][] | null;
+  bodyLandmarks: NormalizedLandmark[] | null;
   videoRef: React.RefObject<HTMLVideoElement | null>;
   startDetection: () => Promise<void>;
   stopDetection: () => void;
@@ -22,6 +23,7 @@ export function useSignDetection(): UseSignDetectionReturn {
   const [recognizedWords, setRecognizedWords] = useState<string[]>([]);
   const [currentSign, setCurrentSign] = useState<string | null>(null);
   const [landmarks, setLandmarks] = useState<NormalizedLandmark[][] | null>(null);
+  const [bodyLandmarks, setBodyLandmarks] = useState<NormalizedLandmark[] | null>(null);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -56,6 +58,7 @@ export function useSignDetection(): UseSignDetectionReturn {
 
     matcherRef.current = null;
     setLandmarks(null);
+    setBodyLandmarks(null);
     setCurrentSign(null);
   }, []);
 
@@ -74,8 +77,16 @@ export function useSignDetection(): UseSignDetectionReturn {
         const result: DetectionResult = detector.detect(video);
 
         setLandmarks(result.landmarks);
+        setBodyLandmarks(result.bodyLandmarks);
 
-        const matchResult = matcher.match(result.right, result.left);
+        const matchResult = matcher.match({
+          right: result.right,
+          left: result.left,
+          rightHandPos: result.rightHandPos,
+          leftHandPos: result.leftHandPos,
+          detectedFace: result.detectedFace,
+        });
+
         if (matchResult) {
           setCurrentSign(matchResult.word);
           setRecognizedWords((prev) => [...prev, matchResult.word]);
@@ -146,6 +157,7 @@ export function useSignDetection(): UseSignDetectionReturn {
     recognizedWords,
     currentSign,
     landmarks,
+    bodyLandmarks,
     videoRef,
     startDetection,
     stopDetection,
