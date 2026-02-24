@@ -2,8 +2,9 @@ import { useEffect, useRef } from 'react';
 import { useSpeech } from '@/hooks/use-speech';
 import { SignAvatar } from '@/components/SignAvatar';
 import { TranscriptionBox } from '@/components/TranscriptionBox';
-import { Mic, Square, Loader2, AlertCircle } from 'lucide-react';
+import { Mic, Square, Loader2, AlertCircle, Hand } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import bgImage from '@assets/image_1771963051387.png';
 
 export default function Home() {
   const {
@@ -37,93 +38,107 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen p-4 md:p-8 flex flex-col max-w-5xl mx-auto">
-      <header className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-4xl md:text-5xl font-display font-bold text-foreground tracking-tight">
-            Sign<span className="text-gradient">Flow</span>
-          </h1>
-          <p className="text-muted-foreground mt-1.5 font-medium">Real-time Speech → ASL Translation</p>
-        </div>
-        <div className="text-right hidden sm:block">
-          <p className="text-xs text-muted-foreground/50 tracking-wide">Powered by Deepgram + 3D ASL</p>
-        </div>
-      </header>
+    <div className="fixed inset-0 overflow-auto">
+      <div
+        className="fixed inset-0 -z-10 bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: `url(${bgImage})` }}
+      />
+      <div className="fixed inset-0 -z-10 bg-black/40 backdrop-blur-[2px]" />
 
-      <main className="flex-1 flex flex-col gap-5">
+      <div className="min-h-screen flex flex-col">
+        <header className="px-6 md:px-10 pt-6 pb-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center" data-testid="logo-icon">
+              <Hand className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h1 className="text-2xl md:text-3xl font-display font-bold text-white tracking-tight">
+                Sign<span className="text-gradient">Flow</span>
+              </h1>
+            </div>
+          </div>
+          <div className="hidden sm:flex items-center gap-2 text-xs text-white/40 tracking-wide">
+            <span className="px-3 py-1.5 rounded-full bg-white/5 border border-white/10 backdrop-blur-sm">
+              Speech → ASL
+            </span>
+          </div>
+        </header>
 
-        {/* 3D Avatar */}
-        <SignAvatar
-          currentWord={currentWord}
-          isRecording={isRecording}
-          signQueue={newFinalWords.length > 0 ? newFinalWords : undefined}
-        />
+        <main className="flex-1 flex flex-col items-center justify-center px-4 md:px-8 pb-6 gap-5">
+          <div className="w-full max-w-4xl">
+            <SignAvatar
+              currentWord={currentWord}
+              isRecording={isRecording}
+              signQueue={newFinalWords.length > 0 ? newFinalWords : undefined}
+            />
+          </div>
 
-        {/* Controls */}
-        <div className="flex flex-col items-center gap-3">
-          <AnimatePresence>
-            {error && (
-              <motion.div
-                initial={{ opacity: 0, y: -8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-                className="bg-destructive/15 text-destructive-foreground px-5 py-2.5 rounded-xl border border-destructive/25 flex items-center gap-2.5 text-sm"
-              >
-                <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                <span className="font-medium">{error}</span>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          <div className="flex flex-col items-center gap-3">
+            <AnimatePresence>
+              {error && (
+                <motion.div
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  className="bg-red-500/15 text-red-200 px-5 py-2.5 rounded-xl border border-red-500/25 backdrop-blur-sm flex items-center gap-2.5 text-sm"
+                  data-testid="error-message"
+                >
+                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                  <span className="font-medium">{error}</span>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
-          <button
-            onClick={handleToggleRecording}
-            disabled={isConnecting}
-            data-testid="toggle-recording-button"
-            className={`
-              group relative flex items-center justify-center gap-3 px-8 py-4 rounded-full font-bold text-lg transition-all duration-300
-              ${isRecording
-                ? 'bg-destructive/10 text-destructive border-2 border-destructive/50 hover:bg-destructive/20'
-                : 'bg-primary text-primary-foreground shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/40 hover:-translate-y-1'
-              }
-              disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none
-            `}
-          >
-            {isConnecting ? (
-              <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                Connecting…
-              </>
-            ) : isRecording ? (
-              <>
-                <Square className="w-5 h-5 fill-current" />
-                Stop Translating
-              </>
-            ) : (
-              <>
-                <Mic className="w-5 h-5" />
-                Start Translating
-              </>
-            )}
+            <button
+              onClick={handleToggleRecording}
+              disabled={isConnecting}
+              data-testid="toggle-recording-button"
+              className={`
+                group relative flex items-center justify-center gap-3 px-8 py-4 rounded-full font-bold text-lg transition-all duration-300 backdrop-blur-sm
+                ${isRecording
+                  ? 'bg-red-500/20 text-red-200 border-2 border-red-400/50 hover:bg-red-500/30'
+                  : 'bg-white/15 text-white border-2 border-white/25 hover:bg-white/25 hover:border-white/40 hover:-translate-y-1 shadow-lg shadow-black/20'
+                }
+                disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none
+              `}
+            >
+              {isConnecting ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Connecting…
+                </>
+              ) : isRecording ? (
+                <>
+                  <Square className="w-5 h-5 fill-current" />
+                  Stop Translating
+                </>
+              ) : (
+                <>
+                  <Mic className="w-5 h-5" />
+                  Start Translating
+                </>
+              )}
+
+              {isRecording && (
+                <span className="absolute inset-0 rounded-full animate-pulse-glow pointer-events-none -z-10" />
+              )}
+            </button>
 
             {isRecording && (
-              <span className="absolute inset-0 rounded-full animate-pulse-glow pointer-events-none -z-10" />
+              <p className="text-xs text-white/40 text-center">
+                Speak naturally — the avatar will sign each word in real-time
+              </p>
             )}
-          </button>
+          </div>
 
-          {isRecording && (
-            <p className="text-xs text-muted-foreground/60 text-center">
-              Speak naturally — the avatar will sign each word in real-time ASL
-            </p>
-          )}
-        </div>
-
-        {/* Transcription */}
-        <TranscriptionBox
-          finalResult={finalResult}
-          interimResult={interimResult}
-        />
-
-      </main>
+          <div className="w-full max-w-4xl">
+            <TranscriptionBox
+              finalResult={finalResult}
+              interimResult={interimResult}
+            />
+          </div>
+        </main>
+      </div>
     </div>
   );
 }

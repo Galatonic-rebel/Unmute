@@ -59,7 +59,7 @@ export function SignAvatar({ currentWord, isRecording, signQueue }: SignAvatarPr
           canvas,
           antialias: true,
           powerPreference: 'high-performance',
-          alpha: false,
+          alpha: true,
         });
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2.5));
         renderer.shadowMap.enabled   = true;
@@ -74,23 +74,7 @@ export function SignAvatar({ currentWord, isRecording, signQueue }: SignAvatarPr
         renderer.setSize(w, h, false);
 
         const scene = new THREE.Scene();
-
-        const bgSphereGeo = new THREE.SphereGeometry(6, 16, 10);
-        bgSphereGeo.scale(-1, -1, -1);
-        const bgMat = new THREE.MeshBasicMaterial({ vertexColors: true });
-        const bgPositions = bgSphereGeo.attributes.position;
-        const bgColors: number[] = [];
-        for (let i = 0; i < bgPositions.count; i++) {
-          const y = bgPositions.getY(i);
-          const t = (y / 6 + 1) / 2;
-          bgColors.push(
-            0.04 + t * 0.06,
-            0.05 + t * 0.09,
-            0.08 + t * 0.16,
-          );
-        }
-        bgSphereGeo.setAttribute('color', new THREE.Float32BufferAttribute(bgColors, 3));
-        scene.add(new THREE.Mesh(bgSphereGeo, bgMat));
+        renderer.setClearColor(0x000000, 0);
 
         const camera = new THREE.PerspectiveCamera(40, w / h, 0.01, 20);
         camera.position.set(0, 0.32, 1.10);
@@ -339,8 +323,8 @@ export function SignAvatar({ currentWord, isRecording, signQueue }: SignAvatarPr
   if (webglError) {
     return (
       <div
-        className="relative w-full rounded-2xl overflow-hidden border border-white/10 flex items-center justify-center"
-        style={{ aspectRatio: '16/10', background: 'linear-gradient(160deg, #0d1825 0%, #0a0f1a 100%)' }}
+        className="relative w-full rounded-2xl overflow-hidden border border-white/10 flex items-center justify-center bg-black/30 backdrop-blur-xl"
+        style={{ aspectRatio: '16/10' }}
         data-testid="sign-avatar-container"
       >
         <div className="text-center px-8">
@@ -356,8 +340,8 @@ export function SignAvatar({ currentWord, isRecording, signQueue }: SignAvatarPr
 
   return (
     <div
-      className="relative w-full rounded-2xl overflow-hidden border border-white/10"
-      style={{ aspectRatio: '16/10', background: '#0a0f1a' }}
+      className="relative w-full rounded-2xl overflow-hidden border border-white/10 bg-black/25 backdrop-blur-sm"
+      style={{ aspectRatio: '16/10' }}
       data-testid="sign-avatar-container"
     >
       <canvas
@@ -367,7 +351,7 @@ export function SignAvatar({ currentWord, isRecording, signQueue }: SignAvatarPr
       />
 
       {loading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-[#0a0f1a]">
+        <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="text-center">
             <div className="w-8 h-8 border-2 border-white/20 border-t-white/60 rounded-full animate-spin mb-3 mx-auto" />
             <p className="text-white/40 text-sm">Loading avatar...</p>
@@ -379,30 +363,26 @@ export function SignAvatar({ currentWord, isRecording, signQueue }: SignAvatarPr
         {isRecording ? (
           <>
             <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse shadow-[0_0_6px_rgba(239,68,68,0.8)]" />
-            <span className="text-xs font-semibold text-white/65 tracking-widest uppercase">Live ASL</span>
+            <span className="text-xs font-semibold text-white/70 tracking-widest uppercase">Live ASL</span>
           </>
         ) : (
-          <span className="text-xs text-white/22 tracking-wider uppercase">Ready</span>
+          <span className="text-xs text-white/25 tracking-wider uppercase">Ready</span>
         )}
       </div>
 
       {currentWord && (
         <div
-          className="absolute bottom-3 left-1/2 -translate-x-1/2 px-5 py-1.5 rounded-full border border-white/12"
-          style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(12px)' }}
+          className="absolute bottom-3 left-1/2 -translate-x-1/2 px-5 py-1.5 rounded-full border border-white/15"
+          style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(12px)' }}
           data-testid="current-word-badge"
         >
           <span className="text-sm font-bold text-white tracking-widest uppercase">{currentWord}</span>
         </div>
       )}
 
-      <div className="absolute top-3 right-3 text-[10px] text-white/18 font-mono tracking-wider select-none">
-        3D · ASL
-      </div>
-
       {!isRecording && !currentWord && !loading && (
         <div className="absolute inset-0 flex items-end justify-center pb-10 pointer-events-none">
-          <p className="text-white/18 text-sm text-center px-8 leading-relaxed">
+          <p className="text-white/20 text-sm text-center px-8 leading-relaxed">
             Speak to see the avatar sign in real-time ASL
           </p>
         </div>

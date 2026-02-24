@@ -6,6 +6,12 @@ SignFlow is a real-time speech-to-ASL (American Sign Language) translation web a
 
 The core flow is: **Microphone → Deepgram STT → ASL pose lookup → 3D avatar animation**.
 
+### UI Design
+- Full-screen nature background image (attached_assets/image_1771963051387.png) with dark overlay
+- Glass-morphism cards for avatar container and transcript box
+- Transparent 3D canvas (alpha: true) so avatar blends with background
+- Premium dark theme with frosted glass buttons and controls
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.

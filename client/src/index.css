@@ -47,12 +47,9 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground antialiased selection:bg-primary/30;
+    @apply text-foreground antialiased selection:bg-primary/30;
     font-family: var(--font-sans);
-    background-image: 
-      radial-gradient(circle at 15% 50%, rgba(99, 102, 241, 0.15) 0%, transparent 50%),
-      radial-gradient(circle at 85% 30%, rgba(168, 85, 247, 0.15) 0%, transparent 50%);
-    background-attachment: fixed;
+    background: #0a0a0a;
   }
   
   h1, h2, h3, h4, h5, h6 {
