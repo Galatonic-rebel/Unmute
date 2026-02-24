@@ -8,6 +8,8 @@ interface SignAvatarProps {
   currentWord: string;
   isRecording: boolean;
   signQueue?: string[];
+  finalResult?: string;
+  interimResult?: string;
 }
 
 interface QueueItem {
@@ -27,7 +29,7 @@ const IDLE_RIGHT: HandPose = {
 };
 const IDLE_LEFT: HandPose = { ...IDLE_RIGHT, wristY: 0.12 };
 
-export function SignAvatar({ currentWord, isRecording, signQueue }: SignAvatarProps) {
+export function SignAvatar({ currentWord, isRecording, signQueue, finalResult, interimResult }: SignAvatarProps) {
   const canvasRef   = useRef<HTMLCanvasElement>(null);
   const avatarRef   = useRef<AvatarController | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -370,23 +372,25 @@ export function SignAvatar({ currentWord, isRecording, signQueue }: SignAvatarPr
         )}
       </div>
 
-      {currentWord && (
-        <div
-          className="absolute bottom-3 left-1/2 -translate-x-1/2 px-5 py-1.5 rounded-full border border-white/15"
-          style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(12px)' }}
-          data-testid="current-word-badge"
-        >
-          <span className="text-sm font-bold text-white tracking-widest uppercase">{currentWord}</span>
-        </div>
-      )}
-
-      {!isRecording && !currentWord && !loading && (
-        <div className="absolute inset-0 flex items-end justify-center pb-10 pointer-events-none">
-          <p className="text-white/20 text-sm text-center px-8 leading-relaxed">
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-[90%] max-w-2xl pointer-events-none" data-testid="subtitle-area">
+        {(finalResult || interimResult) ? (
+          <div
+            className="px-5 py-2.5 rounded-lg text-center"
+            style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }}
+            data-testid="subtitle-text"
+          >
+            <p className="text-sm md:text-base text-white font-medium leading-relaxed">
+              {finalResult && <span>{finalResult}</span>}
+              {finalResult && interimResult && <span> </span>}
+              {interimResult && <span className="text-white/50 italic">{interimResult}</span>}
+            </p>
+          </div>
+        ) : !isRecording && !loading ? (
+          <p className="text-white/20 text-sm text-center">
             Speak to see the avatar sign in real-time ASL
           </p>
-        </div>
-      )}
+        ) : null}
+      </div>
     </div>
   );
 }

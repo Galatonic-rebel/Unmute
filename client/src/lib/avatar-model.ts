@@ -496,21 +496,6 @@ export class AvatarController {
 
   updateMixer(deltaSeconds: number) {
     this.mixer?.update(deltaSeconds);
-    if (this._animationPlaying) {
-      this._applySigningSpread();
-    }
-  }
-
-  private _applySigningSpread() {
-    for (const side of ['left', 'right'] as const) {
-      const chain = this.armChains[side];
-      if (!chain) continue;
-      const sign = side === 'left' ? 1 : -1;
-      const spreadQ = new THREE.Quaternion().setFromEuler(
-        new THREE.Euler(0, 0, sign * 0.12)
-      );
-      chain.shoulder.quaternion.multiply(spreadQ);
-    }
   }
 
   restoreToIdle() {

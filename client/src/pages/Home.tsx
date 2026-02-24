@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useSpeech } from '@/hooks/use-speech';
 import { SignAvatar } from '@/components/SignAvatar';
-import { TranscriptionBox } from '@/components/TranscriptionBox';
 import { Mic, Square, Loader2, AlertCircle, Hand } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import bgImage from '@assets/image_1771963051387.png';
@@ -70,6 +69,8 @@ export default function Home() {
               currentWord={currentWord}
               isRecording={isRecording}
               signQueue={newFinalWords.length > 0 ? newFinalWords : undefined}
+              finalResult={finalResult}
+              interimResult={interimResult}
             />
           </div>
 
@@ -129,13 +130,6 @@ export default function Home() {
                 Speak naturally — the avatar will sign each word in real-time
               </p>
             )}
-          </div>
-
-          <div className="w-full max-w-4xl">
-            <TranscriptionBox
-              finalResult={finalResult}
-              interimResult={interimResult}
-            />
           </div>
         </main>
       </div>
