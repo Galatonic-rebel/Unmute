@@ -405,10 +405,22 @@ export class AvatarController {
 
   private _restoreAfterAnimation() {
     this.restQuats.forEach((restQ, name) => {
+      if (!this._isSigningBone(name)) return;
       const bone = this.bones.get(name);
       if (bone) bone.quaternion.copy(restQ.clone());
     });
-    this._applyIdlePose(1);
+  }
+
+  private static readonly SIGN_BONES = new Set([
+    'Neck', 'Head',
+    'LeftShoulder', 'LeftArm', 'LeftForeArm', 'LeftHand',
+    'RightShoulder', 'RightArm', 'RightForeArm', 'RightHand',
+  ]);
+
+  private _isSigningBone(boneName: string): boolean {
+    if (AvatarController.SIGN_BONES.has(boneName)) return true;
+    if (boneName.startsWith('LeftHand') || boneName.startsWith('RightHand')) return true;
+    return false;
   }
 
   async loadAndPlayAnimation(url: string): Promise<void> {
@@ -429,10 +441,9 @@ export class AvatarController {
           return track;
         })
         .filter(track => {
-          if (track.name.endsWith('.position')) return false;
-          if (track.name.endsWith('.scale')) return false;
-          if (track.name.startsWith('Hips.')) return false;
-          return true;
+          if (!track.name.endsWith('.quaternion')) return false;
+          const boneName = track.name.replace('.quaternion', '');
+          return this._isSigningBone(boneName);
         });
       this.clipCache.set(url, clip);
     }
@@ -441,7 +452,8 @@ export class AvatarController {
 
     const action = this.mixer.clipAction(clip);
     action.setLoop(THREE.LoopOnce, 1);
-    action.clampWhenFinished = true;
+    action.clampWhenFinished = false;
+    action.fadeIn(0.25);
     action.reset();
     action.play();
     this.currentAction = action;
@@ -452,7 +464,6 @@ export class AvatarController {
         if (e.action === action) {
           this.mixer?.removeEventListener('finished', onFinished);
           this._animationPlaying = false;
-          action.fadeOut(0.3);
           this._restoreAfterAnimation();
           resolve();
         }
