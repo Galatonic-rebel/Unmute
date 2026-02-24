@@ -146,10 +146,10 @@ export class AvatarController {
 
       const sign = side === 'left' ? 1 : -1;
       const armDown = new THREE.Quaternion().setFromEuler(
-        new THREE.Euler(0.15, 0, sign * 0.08)
+        new THREE.Euler(0.15, 0, sign * 0.04)
       );
       const forearmBend = new THREE.Quaternion().setFromEuler(
-        new THREE.Euler(0.12, 0, 0)
+        new THREE.Euler(0.08, 0, 0)
       );
 
       this.idleArmQuats[side].arm = armRestQ.clone().multiply(armDown);
@@ -508,10 +508,10 @@ export class AvatarController {
       const sign = side === 'left' ? 1 : -1;
 
       const armSpread = new THREE.Quaternion().setFromEuler(
-        new THREE.Euler(0, 0, sign * -0.2)
+        new THREE.Euler(0, 0, sign * -0.35)
       );
       const spreadArmQ = chain.arm.quaternion.clone().multiply(armSpread);
-      chain.arm.quaternion.slerp(spreadArmQ, 0.6);
+      chain.arm.quaternion.slerp(spreadArmQ, 0.7);
     }
   }
 
