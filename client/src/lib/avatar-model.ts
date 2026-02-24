@@ -403,6 +403,14 @@ export class AvatarController {
     }
   }
 
+  private _restoreAfterAnimation() {
+    this.restQuats.forEach((restQ, name) => {
+      const bone = this.bones.get(name);
+      if (bone) bone.quaternion.copy(restQ.clone());
+    });
+    this._applyIdlePose(1);
+  }
+
   async loadAndPlayAnimation(url: string): Promise<void> {
     if (!this.mixer) return;
 
@@ -415,9 +423,16 @@ export class AvatarController {
         return;
       }
       clip = fbxGroup.animations[0];
-      clip.tracks.forEach(track => {
-        track.name = track.name.replace(/^mixamorig:/, '');
-      });
+      clip.tracks = clip.tracks
+        .map(track => {
+          track.name = track.name.replace(/^mixamorig:?/, '');
+          return track;
+        })
+        .filter(track => {
+          if (track.name.endsWith('.position')) return false;
+          if (track.name.endsWith('.scale')) return false;
+          return true;
+        });
       this.clipCache.set(url, clip);
     }
 
@@ -437,6 +452,7 @@ export class AvatarController {
           this.mixer?.removeEventListener('finished', onFinished);
           this._animationPlaying = false;
           action.fadeOut(0.3);
+          this._restoreAfterAnimation();
           resolve();
         }
       };
@@ -455,6 +471,7 @@ export class AvatarController {
         this.mixer.uncacheAction(this.currentAction.getClip());
       }
       this.currentAction = null;
+      this._restoreAfterAnimation();
     }
     this._animationPlaying = false;
   }
