@@ -508,7 +508,7 @@ export class AvatarController {
       const sign = side === 'left' ? 1 : -1;
 
       const armSpread = new THREE.Quaternion().setFromEuler(
-        new THREE.Euler(-0.05, 0, sign * 0.18)
+        new THREE.Euler(0, 0, sign * -0.2)
       );
       const spreadArmQ = chain.arm.quaternion.clone().multiply(armSpread);
       chain.arm.quaternion.slerp(spreadArmQ, 0.6);
