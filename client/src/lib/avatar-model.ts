@@ -498,7 +498,7 @@ export class AvatarController {
     this.mixer.uncacheAction(clip);
     const action = this.mixer.clipAction(clip);
     action.setLoop(THREE.LoopOnce, 1);
-    action.clampWhenFinished = true;
+    action.clampWhenFinished = false;
     action.reset();
     action.fadeIn(prevAction ? AvatarController.CROSSFADE_DUR : 0.35);
     action.play();
@@ -506,15 +506,27 @@ export class AvatarController {
     this.currentAction = action;
     this._animationPlaying = true;
 
+    const clipDuration = clip.duration * 1000;
+    const safetyTimeout = Math.max(clipDuration + 1000, 3000);
+
     return new Promise<void>((resolve) => {
+      let resolved = false;
+      const done = () => {
+        if (resolved) return;
+        resolved = true;
+        this.mixer?.removeEventListener('finished', onFinished);
+        this._animationPlaying = false;
+        resolve();
+      };
+
       const onFinished = (e: { action: THREE.AnimationAction }) => {
         if (e.action === action) {
-          this.mixer?.removeEventListener('finished', onFinished);
-          this._animationPlaying = false;
-          resolve();
+          done();
         }
       };
       this.mixer!.addEventListener('finished', onFinished);
+
+      setTimeout(done, safetyTimeout);
     });
   }
 
