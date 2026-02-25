@@ -170,12 +170,16 @@ export function SignAvatar({ currentWord, isRecording, signQueue, finalResult, i
             const cur = currentItemRef.current;
             if (cur) {
               av.applySway(now);
-              const lerpT = Math.min(dt / 40, 1);
+              const elapsed = now - itemStartRef.current;
+              const frameDur = cur.holdMs * 0.65;
+              const blendIn = Math.min(elapsed / 120, 1);
+              const eased = blendIn < 1 ? blendIn * blendIn * (3 - 2 * blendIn) : 1;
+              const lerpT = Math.min(dt / 55, 1) * eased + Math.min(dt / 55, 1) * (1 - eased) * 0.3;
               av.applyHandPose('right', cur.right, lerpT);
               av.applyHandPose('left', cur.left, lerpT);
               av.applyExpression(cur.face ?? NEUTRAL_FACE, lerpT);
 
-              const posT = Math.min(dt / 45, 1);
+              const posT = Math.min(dt / 65, 1) * eased + Math.min(dt / 65, 1) * (1 - eased) * 0.3;
               av.setHandTarget('right',
                 cur.right.posX ?? 0,
                 cur.right.posY ?? 0,
@@ -189,13 +193,13 @@ export function SignAvatar({ currentWord, isRecording, signQueue, finalResult, i
                 posT
               );
 
-              if (now - itemStartRef.current >= cur.holdMs * 0.65) {
+              if (elapsed >= frameDur) {
                 currentItemRef.current = null;
               }
             } else if (signingRef.current) {
               av.applySway(now);
             } else {
-              const idleT = Math.min(dt / 120, 1);
+              const idleT = Math.min(dt / 180, 1);
               av.applySway(now);
               av.applyHandPose('right', IDLE_RIGHT, idleT);
               av.applyHandPose('left', IDLE_LEFT, idleT);

@@ -417,8 +417,8 @@ export class AvatarController {
   applySway(time: number) {
     if (!this._loaded) return;
     const ts = time * 0.0006;
-    const swayAngle = Math.sin(ts) * 0.006;
-    const breathAngle = Math.sin(ts * 0.72) * 0.004;
+    const swayAngle = Math.sin(ts) * 0.008 + Math.sin(ts * 1.7) * 0.003;
+    const breathAngle = Math.sin(ts * 0.72) * 0.006;
 
     for (let i = 0; i < this.spineBones.length; i++) {
       const bone = this.spineBones[i];
@@ -476,7 +476,7 @@ export class AvatarController {
     });
   }
 
-  private static readonly CROSSFADE_DUR = 0.45;
+  private static readonly CROSSFADE_DUR = 0.6;
 
   async loadAndPlayAnimation(url: string): Promise<void> {
     if (!this.mixer) return;
