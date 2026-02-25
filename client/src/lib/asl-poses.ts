@@ -474,12 +474,16 @@ export const WORD_SIGNS: Record<string, WordSign> = {
   // ── Greetings & Farewells ──────────────────────────────────
   // HELLO: B-hand salute — flat hand at temple, sweeps outward like a salute
   hello: animSign([
-    { right: atPos(FLAT_B, AT_TEMPLE, 0.01, +0.06), left: FIST, face: HAPPY_FACE, holdMs: 280 },
-    { right: { ...atPos(FLAT_B, AT_TEMPLE - 0.05, 0.07), wristZ: 0.28 }, left: FIST, face: HAPPY_FACE, holdMs: 500 },
+    { right: { ...atPos(OPEN5, AT_TEMPLE, 0.18, +0.10), wristZ: -0.15 }, left: FIST, face: HAPPY_FACE, holdMs: 220 },
+    { right: { ...atPos(OPEN5, AT_TEMPLE, 0.18, +0.10), wristZ: 0.20 }, left: FIST, face: HAPPY_FACE, holdMs: 220 },
+    { right: { ...atPos(OPEN5, AT_TEMPLE, 0.18, +0.10), wristZ: -0.15 }, left: FIST, face: HAPPY_FACE, holdMs: 220 },
+    { right: { ...atPos(OPEN5, AT_TEMPLE, 0.18, +0.10), wristZ: 0.20 }, left: FIST, face: HAPPY_FACE, holdMs: 220 },
   ]),
   hi: animSign([
-    { right: atPos(FLAT_B, AT_TEMPLE, 0.01, +0.06), left: FIST, face: HAPPY_FACE, holdMs: 320 },
-    { right: { ...atPos(FLAT_B, AT_TEMPLE - 0.04, 0.06), wristZ: 0.32 }, left: FIST, face: HAPPY_FACE, holdMs: 380 },
+    { right: { ...atPos(OPEN5, AT_TEMPLE, 0.18, +0.10), wristZ: -0.15 }, left: FIST, face: HAPPY_FACE, holdMs: 200 },
+    { right: { ...atPos(OPEN5, AT_TEMPLE, 0.18, +0.10), wristZ: 0.20 }, left: FIST, face: HAPPY_FACE, holdMs: 200 },
+    { right: { ...atPos(OPEN5, AT_TEMPLE, 0.18, +0.10), wristZ: -0.15 }, left: FIST, face: HAPPY_FACE, holdMs: 200 },
+    { right: { ...atPos(OPEN5, AT_TEMPLE, 0.18, +0.10), wristZ: 0.20 }, left: FIST, face: HAPPY_FACE, holdMs: 200 },
   ]),
   goodbye: animSign([
     { right: OPEN, left: FIST, face: HAPPY_FACE, holdMs: 280 },
