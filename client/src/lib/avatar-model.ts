@@ -109,6 +109,14 @@ export class AvatarController {
         forearm.getWorldPosition(forearmPos);
         hand.getWorldPosition(handPos);
 
+        const armScale = 0.92;
+        arm.scale.setScalar(armScale);
+
+        arm.updateWorldMatrix(true, true);
+        arm.getWorldPosition(armPos);
+        forearm.getWorldPosition(forearmPos);
+        hand.getWorldPosition(handPos);
+
         const key = side.toLowerCase() as 'left' | 'right';
         this.armChains[key] = {
           shoulder, arm, forearm, hand,
@@ -445,13 +453,20 @@ export class AvatarController {
       const chain = this.armChains[side];
       if (!chain || this._animationPlaying) continue;
       const s = side === 'left' ? 1 : -1;
-      const armDrift = Math.sin(ts * 0.6 + s * 1.2) * 0.008;
-      const forearmDrift = Math.sin(ts * 0.9 + s * 0.8) * 0.006;
+      const phase = s * 1.5;
+      const armSwingX = Math.sin(ts * 0.72 + phase) * 0.014
+                      + Math.sin(ts * 1.35 + phase * 0.7) * 0.007
+                      + Math.sin(ts * 2.1 + phase * 1.3) * 0.004;
+      const armSwingZ = Math.sin(ts * 0.55 + phase + 0.8) * 0.010
+                      + Math.sin(ts * 1.8 + phase * 0.5) * 0.005;
+      const forearmSwing = Math.sin(ts * 0.9 + phase + 1.5) * 0.012
+                         + Math.sin(ts * 1.6 + phase * 1.1) * 0.006;
+      const breathLink = breathX * 0.3;
       const armQ = new THREE.Quaternion().setFromEuler(
-        new THREE.Euler(armDrift, 0, forearmDrift * s)
+        new THREE.Euler(armSwingX + breathLink, 0, (armSwingZ + breathLink * 0.5) * s)
       );
       const forearmQ = new THREE.Quaternion().setFromEuler(
-        new THREE.Euler(forearmDrift, 0, 0)
+        new THREE.Euler(forearmSwing + breathLink * 0.5, 0, 0)
       );
       chain.arm.quaternion.multiply(armQ);
       chain.forearm.quaternion.multiply(forearmQ);
