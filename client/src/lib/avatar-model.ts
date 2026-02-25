@@ -27,7 +27,7 @@ interface ArmChain {
 
 const SIGN_REST_MODEL_Y = 1.15;
 const SIGN_BASE_Z = 0.22;
-const SIGN_SIDE_X = 0.10;
+const SIGN_SIDE_X = 0.20;
 
 export class AvatarController {
   public root: THREE.Group;
@@ -143,7 +143,7 @@ export class AvatarController {
       if (!shoulderRestQ) continue;
 
       const spread = new THREE.Quaternion().setFromEuler(
-        new THREE.Euler(0, 0, sign * -0.22)
+        new THREE.Euler(0, 0, sign * -0.38)
       );
       const newQ = shoulderRestQ.clone().multiply(spread);
       chain.shoulder.quaternion.copy(newQ);
@@ -166,7 +166,7 @@ export class AvatarController {
 
       const sign = side === 'left' ? 1 : -1;
       const armDown = new THREE.Quaternion().setFromEuler(
-        new THREE.Euler(0.15, 0, sign * 0.08)
+        new THREE.Euler(0.15, 0, sign * 0.18)
       );
       const forearmBend = new THREE.Quaternion().setFromEuler(
         new THREE.Euler(0.12, 0, 0)
@@ -217,11 +217,11 @@ export class AvatarController {
     );
     const angleA = Math.acos(cosA);
 
-    const poleOffset = side === 'left' ? 0.15 : -0.15;
+    const poleOffset = side === 'left' ? 0.40 : -0.40;
     const poleWorld = new THREE.Vector3(
       shoulderPos.x + poleOffset,
-      shoulderPos.y - 0.5,
-      shoulderPos.z - 0.4
+      shoulderPos.y - 0.30,
+      shoulderPos.z - 0.20
     );
 
     const toPole = poleWorld.clone().sub(shoulderPos);
