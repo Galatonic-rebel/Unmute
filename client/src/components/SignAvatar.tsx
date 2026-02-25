@@ -46,6 +46,8 @@ export function SignAvatar({ currentWord, isRecording, signQueue, finalResult, i
   const prevSignQueueRef    = useRef<string[] | undefined>(undefined);
   const abortRef            = useRef<AbortController | null>(null);
   const signingRef          = useRef<boolean>(false);
+  const wordQueueRef        = useRef<string[]>([]);
+  const processingRef       = useRef<boolean>(false);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -253,21 +255,25 @@ export function SignAvatar({ currentWord, isRecording, signQueue, finalResult, i
     if (!signQueue?.length || signQueue === prevSignQueueRef.current) return;
     prevSignQueueRef.current = signQueue;
 
-    if (abortRef.current) abortRef.current.abort();
-    const ac = new AbortController();
-    abortRef.current = ac;
-
     const av = avatarRef.current;
     if (!av) return;
 
-    poseQueueRef.current   = [];
-    currentItemRef.current = null;
-    signingRef.current     = true;
+    wordQueueRef.current.push(...signQueue);
+    signingRef.current = true;
+
+    if (processingRef.current) return;
+    processingRef.current = true;
+
+    if (!abortRef.current || abortRef.current.signal.aborted) {
+      abortRef.current = new AbortController();
+    }
+    const ac = abortRef.current;
 
     (async () => {
-      for (const word of signQueue) {
+      while (wordQueueRef.current.length > 0) {
         if (ac.signal.aborted) break;
 
+        const word = wordQueueRef.current.shift()!;
         const lower = word.toLowerCase().trim();
         if (!lower) continue;
 
@@ -278,15 +284,15 @@ export function SignAvatar({ currentWord, isRecording, signQueue, finalResult, i
             console.warn('FBX animation failed for word:', lower, err);
             const fallback = wordToSignQueue(lower);
             poseQueueRef.current.push(...fallback);
-            const totalMs = fallback.reduce((sum, f) => sum + f.holdMs, 0);
-            await waitMs(totalMs + 200, ac.signal);
+            const totalMs = fallback.reduce((sum, f) => sum + f.holdMs * 0.55, 0);
+            await waitMs(totalMs + 120, ac.signal);
           }
         } else {
           const poseFrames = wordToSignQueue(lower);
           if (poseFrames.length > 0) {
             poseQueueRef.current.push(...poseFrames);
-            const totalMs = poseFrames.reduce((sum, f) => sum + f.holdMs, 0);
-            await waitMs(totalMs + 200, ac.signal);
+            const totalMs = poseFrames.reduce((sum, f) => sum + f.holdMs * 0.55, 0);
+            await waitMs(totalMs + 120, ac.signal);
           } else {
             for (const letter of lower) {
               if (ac.signal.aborted) break;
@@ -300,10 +306,9 @@ export function SignAvatar({ currentWord, isRecording, signQueue, finalResult, i
             }
           }
         }
-
-        if (ac.signal.aborted) break;
       }
 
+      processingRef.current = false;
       signingRef.current = false;
       if (!ac.signal.aborted) {
         av.restoreToIdle();
@@ -315,6 +320,8 @@ export function SignAvatar({ currentWord, isRecording, signQueue, finalResult, i
     if (!isRecording) {
       if (abortRef.current) abortRef.current.abort();
       signingRef.current = false;
+      processingRef.current = false;
+      wordQueueRef.current = [];
       const av = avatarRef.current;
       if (av) {
         av.stopAnimation();
