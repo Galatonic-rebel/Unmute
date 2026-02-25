@@ -12,9 +12,9 @@ const FINGER_MAP: Record<string, string> = {
 
 const CURL_MAX = Math.PI * 0.90;
 const CURL_WEIGHTS = [0.36, 0.40, 0.24];
-const THUMB_FLEX_MAX = Math.PI * 0.54;
-const THUMB_ABD_MAX = Math.PI * 0.46;
-const THUMB_FLEX_WEIGHTS = [0.35, 0.42, 0.23];
+const THUMB_FLEX_MAX = Math.PI * 0.32;
+const THUMB_ABD_MAX = Math.PI * 0.22;
+const THUMB_FLEX_WEIGHTS = [0.38, 0.40, 0.22];
 
 interface ArmChain {
   shoulder: THREE.Bone;

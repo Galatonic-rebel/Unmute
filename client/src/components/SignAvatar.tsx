@@ -20,7 +20,7 @@ interface QueueItem {
 }
 
 const IDLE_RIGHT: HandPose = {
-  thumb:  { flex: 0.1, abd: 0.5 },
+  thumb:  { flex: 0.15, abd: 0.25 },
   index:  { curl: 0.15, spread: -0.05 },
   middle: { curl: 0.15, spread: 0 },
   ring:   { curl: 0.18, spread: 0.05 },
