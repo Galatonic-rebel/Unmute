@@ -1,5 +1,6 @@
 const WORD_ANIMS: Record<string, string> = {
   hello: '/animations/words/hello.fbx',
+  hi: '/animations/words/hello.fbx',
   bye: '/animations/words/bye.fbx',
   calm: '/animations/words/calm.fbx',
   camera: '/animations/words/camera.fbx',
