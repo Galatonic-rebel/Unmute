@@ -166,10 +166,10 @@ export class AvatarController {
 
       const sign = side === 'left' ? 1 : -1;
       const armDown = new THREE.Quaternion().setFromEuler(
-        new THREE.Euler(0.15, 0, sign * 0.10)
+        new THREE.Euler(0.22, 0, sign * 0.05)
       );
       const forearmBend = new THREE.Quaternion().setFromEuler(
-        new THREE.Euler(0.12, 0, 0)
+        new THREE.Euler(0.08, 0, 0)
       );
 
       this.idleArmQuats[side].arm = armRestQ.clone().multiply(armDown);

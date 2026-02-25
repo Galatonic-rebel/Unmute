@@ -87,9 +87,9 @@ export function SignAvatar({ currentWord, isRecording, signQueue, finalResult, i
         scene.environment = envRT.texture;
         pmremGen.dispose();
 
-        scene.add(new THREE.HemisphereLight(0xfff4e0, 0x2a2a3e, 0.65));
+        scene.add(new THREE.HemisphereLight(0xfff4e0, 0x2a2a3e, 1.0));
 
-        const key = new THREE.DirectionalLight(0xffecd0, 2.0);
+        const key = new THREE.DirectionalLight(0xffecd0, 2.8);
         key.position.set(-0.6, 2.0, 1.8);
         key.castShadow = true;
         key.shadow.mapSize.set(2048, 2048);
@@ -101,7 +101,7 @@ export function SignAvatar({ currentWord, isRecording, signQueue, finalResult, i
         key.shadow.bias   = -0.0003;
         scene.add(key);
 
-        const fill = new THREE.DirectionalLight(0xc0e0ff, 0.75);
+        const fill = new THREE.DirectionalLight(0xc0e0ff, 1.1);
         fill.position.set(1.5, 0.6, 1.0);
         scene.add(fill);
 
@@ -113,7 +113,7 @@ export function SignAvatar({ currentWord, isRecording, signQueue, finalResult, i
         bounce.position.set(0, -1.5, 0.8);
         scene.add(bounce);
 
-        const face = new THREE.PointLight(0xffe8d8, 0.4, 3);
+        const face = new THREE.PointLight(0xffe8d8, 0.7, 3);
         face.position.set(0, 0.45, 0.9);
         scene.add(face);
 
@@ -126,7 +126,7 @@ export function SignAvatar({ currentWord, isRecording, signQueue, finalResult, i
           return;
         }
 
-        avatar.root.scale.setScalar(0.765);
+        avatar.root.scale.setScalar(0.69);
         avatar.root.position.y = -0.70;
         avatar.root.position.z = 0.02;
         scene.add(avatar.root);
