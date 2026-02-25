@@ -49,6 +49,12 @@ const LANDMARK = {
 
 const POSE_LANDMARK = {
   NOSE: 0,
+  LEFT_EYE_INNER: 1,
+  RIGHT_EYE_INNER: 4,
+  LEFT_EAR: 7,
+  RIGHT_EAR: 8,
+  MOUTH_LEFT: 9,
+  MOUTH_RIGHT: 10,
   LEFT_SHOULDER: 11,
   RIGHT_SHOULDER: 12,
   LEFT_ELBOW: 13,
@@ -212,6 +218,10 @@ function computeHandRelativePos(
   const nose = bodyLandmarks[POSE_LANDMARK.NOSE];
   const lHip = bodyLandmarks[POSE_LANDMARK.LEFT_HIP];
   const rHip = bodyLandmarks[POSE_LANDMARK.RIGHT_HIP];
+  const mouthL = bodyLandmarks[POSE_LANDMARK.MOUTH_LEFT];
+  const mouthR = bodyLandmarks[POSE_LANDMARK.MOUTH_RIGHT];
+  const eyeL = bodyLandmarks[POSE_LANDMARK.LEFT_EYE_INNER];
+  const eyeR = bodyLandmarks[POSE_LANDMARK.RIGHT_EYE_INNER];
 
   const shoulderMidX = (lShoulder.x + rShoulder.x) / 2;
   const shoulderMidY = (lShoulder.y + rShoulder.y) / 2;
@@ -219,23 +229,54 @@ function computeHandRelativePos(
   const scale = shoulderWidth > 0.01 ? shoulderWidth : 0.2;
 
   const hipMidY = (lHip.y + rHip.y) / 2;
-  const noseY = nose.y;
-  const bodyHeight = hipMidY - noseY;
-
   const handY = handWrist.y;
-  const relativeHeight = (shoulderMidY - handY) / (bodyHeight > 0.05 ? bodyHeight : 0.3);
 
-  const AT_REST = -0.08;
-  const FACE_TOP = 0.72;
-  const posY = AT_REST + relativeHeight * (FACE_TOP - AT_REST);
+  const rawEyeY = (eyeL.y + eyeR.y) / 2;
+  const rawNoseY = nose.y;
+  const rawMouthY = (mouthL.y + mouthR.y) / 2;
+
+  const noseY = rawNoseY;
+  const eyeY = rawEyeY < noseY ? rawEyeY : noseY - 0.02;
+  const mouthY = rawMouthY > noseY ? rawMouthY : noseY + 0.02;
+  const foreheadY = eyeY - Math.max(0.01, (noseY - eyeY) * 0.3);
+  const chinY = mouthY + Math.max(0.01, (mouthY - noseY) * 0.7);
+
+  const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
+
+  let posY: number;
+  if (handY <= foreheadY) {
+    posY = 0.68;
+  } else if (handY <= eyeY) {
+    const t = clamp01((eyeY - handY) / Math.max(0.01, eyeY - foreheadY));
+    posY = 0.62 + t * (0.68 - 0.62);
+  } else if (handY <= noseY) {
+    const t = clamp01((noseY - handY) / Math.max(0.01, noseY - eyeY));
+    posY = 0.54 + t * (0.62 - 0.54);
+  } else if (handY <= mouthY) {
+    const t = clamp01((mouthY - handY) / Math.max(0.01, mouthY - noseY));
+    posY = 0.51 + t * (0.54 - 0.51);
+  } else if (handY <= chinY) {
+    const t = clamp01((chinY - handY) / Math.max(0.01, chinY - mouthY));
+    posY = 0.40 + t * (0.51 - 0.40);
+  } else if (handY <= shoulderMidY) {
+    const t = clamp01((shoulderMidY - handY) / Math.max(0.01, shoulderMidY - chinY));
+    posY = 0.12 + t * (0.40 - 0.12);
+  } else if (handY <= hipMidY) {
+    const t = clamp01((hipMidY - handY) / Math.max(0.01, hipMidY - shoulderMidY));
+    posY = -0.08 + t * (0.12 - (-0.08));
+  } else {
+    posY = -0.08;
+  }
 
   const lateralOffset = (shoulderMidX - handWrist.x) / scale;
   const posX = lateralOffset * 0.15;
 
-  const shoulderMidZ = ((lShoulder as any).z ?? 0 + (rShoulder as any).z ?? 0) / 2;
+  const lsZ = (lShoulder as any).z ?? 0;
+  const rsZ = (rShoulder as any).z ?? 0;
+  const shoulderMidZ = (lsZ + rsZ) / 2;
   const handZ = (handWrist as any).z ?? 0;
   const depthDiff = shoulderMidZ - handZ;
-  const posZ = depthDiff * 0.3;
+  const posZ = Math.max(-0.1, Math.min(0.2, depthDiff * 0.3));
 
   return { posX, posY, posZ };
 }

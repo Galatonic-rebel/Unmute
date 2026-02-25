@@ -7,6 +7,13 @@ export interface MatchResult {
   confidence: number;
 }
 
+export interface MatchCandidate {
+  word: string;
+  distance: number;
+  shapeDist: number;
+  posDist: number;
+}
+
 export interface FullMatchInput {
   right: HandPose | null;
   left: HandPose | null;
@@ -15,20 +22,8 @@ export interface FullMatchInput {
   detectedFace: FaceExpression | null;
 }
 
-const WEIGHTS = {
-  curl: 1.0,
-  spread: 0.4,
-  thumbFlex: 0.9,
-  thumbAbd: 0.7,
-  wrist: 0.3,
-  posY: 2.0,
-  posX: 0.8,
-  posZ: 0.4,
-  face: 0.5,
-};
-
-const CONFIDENCE_THRESHOLD = 0.45;
-const STABILITY_FRAMES = 8;
+const CONFIDENCE_THRESHOLD = 0.35;
+const STABILITY_FRAMES = 10;
 const COOLDOWN_FRAMES = 15;
 
 function handShapeDistance(detected: HandPose, reference: HandPose): number {
@@ -36,46 +31,36 @@ function handShapeDistance(detected: HandPose, reference: HandPose): number {
   let totalDist = 0;
 
   const fingers: Array<"index" | "middle" | "ring" | "pinky"> = [
-    "index",
-    "middle",
-    "ring",
-    "pinky",
+    "index", "middle", "ring", "pinky",
   ];
 
   for (const finger of fingers) {
     const dCurl = detected[finger].curl - reference[finger].curl;
-    totalDist += dCurl * dCurl * WEIGHTS.curl;
-    totalWeight += WEIGHTS.curl;
+    totalDist += dCurl * dCurl * 1.0;
+    totalWeight += 1.0;
 
     const dSpread = detected[finger].spread - reference[finger].spread;
-    totalDist += dSpread * dSpread * WEIGHTS.spread;
-    totalWeight += WEIGHTS.spread;
+    totalDist += dSpread * dSpread * 0.3;
+    totalWeight += 0.3;
   }
 
   const dThumbFlex = detected.thumb.flex - reference.thumb.flex;
-  totalDist += dThumbFlex * dThumbFlex * WEIGHTS.thumbFlex;
-  totalWeight += WEIGHTS.thumbFlex;
+  totalDist += dThumbFlex * dThumbFlex * 0.9;
+  totalWeight += 0.9;
 
   const dThumbAbd = detected.thumb.abd - reference.thumb.abd;
-  totalDist += dThumbAbd * dThumbAbd * WEIGHTS.thumbAbd;
-  totalWeight += WEIGHTS.thumbAbd;
+  totalDist += dThumbAbd * dThumbAbd * 0.6;
+  totalWeight += 0.6;
 
   if (reference.wristX !== undefined && detected.wristX !== undefined) {
-    const dWristX = detected.wristX - reference.wristX;
-    totalDist += dWristX * dWristX * WEIGHTS.wrist;
-    totalWeight += WEIGHTS.wrist;
+    const d = detected.wristX - reference.wristX;
+    totalDist += d * d * 0.2;
+    totalWeight += 0.2;
   }
-
   if (reference.wristY !== undefined && detected.wristY !== undefined) {
-    const dWristY = detected.wristY - reference.wristY;
-    totalDist += dWristY * dWristY * WEIGHTS.wrist;
-    totalWeight += WEIGHTS.wrist;
-  }
-
-  if (reference.wristZ !== undefined && detected.wristZ !== undefined) {
-    const dWristZ = detected.wristZ - reference.wristZ;
-    totalDist += dWristZ * dWristZ * WEIGHTS.wrist;
-    totalWeight += WEIGHTS.wrist;
+    const d = detected.wristY - reference.wristY;
+    totalDist += d * d * 0.2;
+    totalWeight += 0.2;
   }
 
   return totalWeight > 0 ? Math.sqrt(totalDist / totalWeight) : 1;
@@ -88,28 +73,28 @@ function positionDistance(
   if (!detected) return 0;
   if (reference.posY === undefined && reference.posX === undefined) return 0;
 
-  let totalWeight = 0;
-  let totalDist = 0;
+  let sumSq = 0;
+  let count = 0;
 
   if (reference.posY !== undefined) {
     const dy = detected.posY - reference.posY;
-    totalDist += dy * dy * WEIGHTS.posY;
-    totalWeight += WEIGHTS.posY;
+    sumSq += dy * dy * 3.0;
+    count += 3.0;
   }
 
   if (reference.posX !== undefined) {
     const dx = detected.posX - reference.posX;
-    totalDist += dx * dx * WEIGHTS.posX;
-    totalWeight += WEIGHTS.posX;
+    sumSq += dx * dx * 1.0;
+    count += 1.0;
   }
 
   if (reference.posZ !== undefined) {
     const dz = detected.posZ - reference.posZ;
-    totalDist += dz * dz * WEIGHTS.posZ;
-    totalWeight += WEIGHTS.posZ;
+    sumSq += dz * dz * 0.5;
+    count += 0.5;
   }
 
-  return totalWeight > 0 ? Math.sqrt(totalDist / totalWeight) : 0;
+  return count > 0 ? Math.sqrt(sumSq / count) : 0;
 }
 
 function faceDistance(
@@ -131,52 +116,23 @@ function faceDistance(
     dCheek * dCheek * 0.5 +
     dSquint * dSquint * 0.5;
 
-  return Math.sqrt(sumSq / 4) * WEIGHTS.face;
+  return Math.sqrt(sumSq / 4);
 }
 
-function combinedDistance(
-  handDist: number,
-  posDist: number,
-  faceDist: number,
-  hasPosition: boolean,
-  hasFace: boolean,
-): number {
-  if (!hasPosition && !hasFace) return handDist;
-
-  let total = handDist * 0.35;
-  let totalWeight = 0.35;
-
-  if (hasPosition) {
-    total += posDist * 0.50;
-    totalWeight += 0.50;
-  }
-
-  if (hasFace) {
-    total += faceDist * 0.15;
-    totalWeight += 0.15;
-  }
-
-  return total / totalWeight;
+function getRegionIndex(posY: number): number {
+  if (posY > 0.55) return 4;
+  if (posY > 0.42) return 3;
+  if (posY > 0.25) return 2;
+  if (posY > 0.05) return 1;
+  return 0;
 }
 
-function positionRegion(pos: HandRelativePos | null): string {
-  if (!pos) return "unknown";
-  const y = pos.posY;
-  if (y > 0.55) return "forehead";
-  if (y > 0.42) return "face";
-  if (y > 0.30) return "chin";
-  if (y > 0.08) return "chest";
-  return "low";
-}
-
-function refPositionRegion(pose: HandPose): string {
-  const y = pose.posY;
-  if (y === undefined) return "any";
-  if (y > 0.55) return "forehead";
-  if (y > 0.42) return "face";
-  if (y > 0.30) return "chin";
-  if (y > 0.08) return "chest";
-  return "low";
+function regionLabel(posY: number): string {
+  if (posY > 0.55) return "FOREHEAD";
+  if (posY > 0.42) return "FACE";
+  if (posY > 0.25) return "CHIN";
+  if (posY > 0.05) return "CHEST";
+  return "LOW";
 }
 
 export class SignMatcher {
@@ -184,6 +140,9 @@ export class SignMatcher {
   private stableCount = 0;
   private cooldownCounter = 0;
   private lastRecognized: string | null = null;
+  public lastCandidates: MatchCandidate[] = [];
+  public lastRegion: string = "";
+  public lastPosY: number = 0;
 
   match(input: FullMatchInput): MatchResult | null {
     if (this.cooldownCounter > 0) {
@@ -198,6 +157,7 @@ export class SignMatcher {
     if (!right && !left) {
       this.stableSign = null;
       this.stableCount = 0;
+      this.lastCandidates = [];
       return null;
     }
 
@@ -205,17 +165,21 @@ export class SignMatcher {
     const dominantPos = right ? rightHandPos : leftHandPos;
     if (!dominantHand) return null;
 
-    const detectedRegion = positionRegion(dominantPos);
+    const detPosY = dominantPos?.posY ?? -0.08;
+    const detRegionIdx = dominantPos ? getRegionIndex(detPosY) : -1;
+    this.lastRegion = dominantPos ? regionLabel(detPosY) : "?";
+    this.lastPosY = detPosY;
 
-    let bestMatch: string | null = null;
-    let bestDistance = Infinity;
+    const candidates: MatchCandidate[] = [];
 
     for (const [letter, pose] of Object.entries(FINGERSPELLING)) {
-      const shapeDist = handShapeDistance(dominantHand, pose);
-      if (shapeDist < bestDistance) {
-        bestDistance = shapeDist;
-        bestMatch = letter;
+      let shapeDist = handShapeDistance(dominantHand, pose);
+      if (dominantPos && detRegionIdx >= 3) {
+        shapeDist += 0.15;
+      } else if (dominantPos && detRegionIdx === 2) {
+        shapeDist += 0.05;
       }
+      candidates.push({ word: letter, distance: shapeDist, shapeDist, posDist: 0 });
     }
 
     for (const [word, sign] of Object.entries(WORD_SIGNS)) {
@@ -223,58 +187,65 @@ export class SignMatcher {
       const firstFrame = sign.frames[0];
       const refPose = firstFrame.right;
 
-      const refRegion = refPositionRegion(refPose);
-      if (
-        dominantPos &&
-        refRegion !== "any" &&
-        detectedRegion !== "unknown" &&
-        refRegion !== detectedRegion
-      ) {
-        const regionOrder = ["low", "chest", "chin", "face", "forehead"];
-        const detIdx = regionOrder.indexOf(detectedRegion);
-        const refIdx = regionOrder.indexOf(refRegion);
-        if (Math.abs(detIdx - refIdx) > 1) continue;
+      const refHasPos = refPose.posY !== undefined;
+
+      if (dominantPos && refHasPos) {
+        const refRegionIdx = getRegionIndex(refPose.posY!);
+        const regionDiff = Math.abs(detRegionIdx - refRegionIdx);
+        if (regionDiff > 1) continue;
       }
 
       const shapeDist = handShapeDistance(dominantHand, refPose);
       const posDist = positionDistance(dominantPos, refPose);
-      const faceDist = faceDistance(detectedFace, firstFrame.face);
 
-      const hasPos = refPose.posY !== undefined;
       const hasFace = firstFrame.face !== undefined &&
-        (firstFrame.face.eyebrowRaise !== 0 ||
-         firstFrame.face.mouthOpen > 0.1 ||
-         firstFrame.face.mouthSmile !== 0);
+        (Math.abs(firstFrame.face.eyebrowRaise) > 0.2 ||
+         firstFrame.face.mouthOpen > 0.15 ||
+         Math.abs(firstFrame.face.mouthSmile) > 0.2);
+      const faceDist = hasFace ? faceDistance(detectedFace, firstFrame.face) : 0;
 
-      const dist = combinedDistance(shapeDist, posDist, faceDist, hasPos, hasFace);
-
-      if (dist < bestDistance) {
-        bestDistance = dist;
-        bestMatch = word;
+      let dist: number;
+      if (refHasPos && dominantPos) {
+        dist = shapeDist * 0.25 + posDist * 0.60 + faceDist * 0.15;
+      } else if (refHasPos && !dominantPos) {
+        dist = shapeDist * 0.85 + faceDist * 0.15;
+      } else {
+        dist = shapeDist * 0.85 + faceDist * 0.15;
+        if (dominantPos && detRegionIdx >= 3) {
+          dist += 0.18;
+        } else if (dominantPos && detRegionIdx === 2) {
+          dist += 0.08;
+        }
       }
+
+      candidates.push({ word, distance: dist, shapeDist, posDist });
     }
 
-    if (bestDistance > CONFIDENCE_THRESHOLD || !bestMatch) {
+    candidates.sort((a, b) => a.distance - b.distance);
+    this.lastCandidates = candidates.slice(0, 5);
+
+    const best = candidates[0];
+    if (!best || best.distance > CONFIDENCE_THRESHOLD) {
       this.stableSign = null;
       this.stableCount = 0;
       return null;
     }
 
-    const confidence = 1 - bestDistance / CONFIDENCE_THRESHOLD;
+    const confidence = 1 - best.distance / CONFIDENCE_THRESHOLD;
 
-    if (bestMatch === this.stableSign) {
+    if (best.word === this.stableSign) {
       this.stableCount++;
     } else {
-      this.stableSign = bestMatch;
+      this.stableSign = best.word;
       this.stableCount = 1;
     }
 
     if (this.stableCount >= STABILITY_FRAMES) {
-      if (bestMatch !== this.lastRecognized || this.cooldownCounter === 0) {
-        this.lastRecognized = bestMatch;
+      if (best.word !== this.lastRecognized || this.cooldownCounter === 0) {
+        this.lastRecognized = best.word;
         this.cooldownCounter = COOLDOWN_FRAMES;
         this.stableCount = 0;
-        return { word: bestMatch, confidence };
+        return { word: best.word, confidence };
       }
     }
 
@@ -286,5 +257,8 @@ export class SignMatcher {
     this.stableCount = 0;
     this.cooldownCounter = 0;
     this.lastRecognized = null;
+    this.lastCandidates = [];
+    this.lastRegion = "";
+    this.lastPosY = 0;
   }
 }

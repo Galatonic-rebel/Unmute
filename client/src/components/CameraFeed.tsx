@@ -1,8 +1,9 @@
-import { useEffect, useRef, useCallback } from 'react';
-import { Volume2, Trash2 } from 'lucide-react';
+import { useEffect, useRef, useCallback, useState } from 'react';
+import { Volume2, Trash2, Bug } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import type { NormalizedLandmark } from '@mediapipe/tasks-vision';
+import type { DebugInfo } from '@/hooks/use-sign-detection';
 
 interface CameraFeedProps {
   isDetecting: boolean;
@@ -10,6 +11,7 @@ interface CameraFeedProps {
   recognizedWords: string[];
   landmarks: NormalizedLandmark[][] | null;
   bodyLandmarks: NormalizedLandmark[] | null;
+  debugInfo: DebugInfo | null;
   polishedSentence: string;
   isSpeaking: boolean;
   onSpeak: () => void;
@@ -40,6 +42,7 @@ export function CameraFeed({
   recognizedWords,
   landmarks,
   bodyLandmarks,
+  debugInfo,
   polishedSentence,
   isSpeaking,
   onSpeak,
@@ -48,6 +51,7 @@ export function CameraFeed({
 }: CameraFeedProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rafRef = useRef<number>(0);
+  const [showDebug, setShowDebug] = useState(false);
 
   const drawOverlay = useCallback(() => {
     const canvas = canvasRef.current;
@@ -191,16 +195,49 @@ export function CameraFeed({
         data-testid="camera-feed-canvas"
       />
 
-      <div className="absolute top-3 left-3 flex items-center gap-2 pointer-events-none">
+      <div className="absolute top-3 left-3 flex items-center gap-2">
         {isDetecting ? (
-          <>
+          <div className="flex items-center gap-2 pointer-events-none">
             <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse shadow-[0_0_6px_rgba(239,68,68,0.8)]" />
             <span className="text-xs font-semibold text-white/70 tracking-widest uppercase">Detecting</span>
-          </>
+          </div>
         ) : (
-          <span className="text-xs text-white/25 tracking-wider uppercase">Camera Ready</span>
+          <span className="text-xs text-white/25 tracking-wider uppercase pointer-events-none">Camera Ready</span>
+        )}
+        {isDetecting && (
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={() => setShowDebug((v) => !v)}
+            className={`w-6 h-6 ${showDebug ? 'text-yellow-400' : 'text-white/30'}`}
+            data-testid="button-debug-toggle"
+          >
+            <Bug className="w-3.5 h-3.5" />
+          </Button>
         )}
       </div>
+
+      {showDebug && debugInfo && isDetecting && (
+        <div
+          className="absolute top-10 left-3 text-[10px] font-mono leading-tight max-w-[200px] p-2 rounded-lg pointer-events-none"
+          style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)' }}
+          data-testid="debug-panel"
+        >
+          <div className="text-yellow-300 font-bold mb-1">
+            {debugInfo.region} (posY: {debugInfo.posY.toFixed(2)})
+          </div>
+          {debugInfo.candidates.length > 0 && (
+            <div className="space-y-0.5">
+              {debugInfo.candidates.map((c, i) => (
+                <div key={i} className={i === 0 ? 'text-green-300' : 'text-white/50'}>
+                  {c.word}: {c.distance.toFixed(3)}
+                  <span className="text-white/30"> s:{c.shapeDist.toFixed(2)} p:{c.posDist.toFixed(2)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <AnimatePresence>
         {currentSign && (
@@ -272,7 +309,7 @@ export function CameraFeed({
           </div>
         ) : isDetecting ? (
           <p className="text-white/20 text-sm text-center">
-            Show signs to the camera — hands, arms, and face are all tracked
+            Show ASL signs to the camera — hands, arms, and face are all tracked
           </p>
         ) : null}
       </div>

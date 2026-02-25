@@ -1,10 +1,16 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { PoseDetector, type DetectionResult } from "@/lib/pose-detector";
-import { SignMatcher } from "@/lib/sign-matcher";
+import { SignMatcher, type MatchCandidate } from "@/lib/sign-matcher";
 import type { NormalizedLandmark } from "@mediapipe/tasks-vision";
 
 const TARGET_FPS = 15;
 const FRAME_INTERVAL = 1000 / TARGET_FPS;
+
+export interface DebugInfo {
+  posY: number;
+  region: string;
+  candidates: MatchCandidate[];
+}
 
 export interface UseSignDetectionReturn {
   isDetecting: boolean;
@@ -12,6 +18,7 @@ export interface UseSignDetectionReturn {
   currentSign: string | null;
   landmarks: NormalizedLandmark[][] | null;
   bodyLandmarks: NormalizedLandmark[] | null;
+  debugInfo: DebugInfo | null;
   videoRef: React.RefObject<HTMLVideoElement | null>;
   startDetection: () => Promise<void>;
   stopDetection: () => void;
@@ -24,6 +31,7 @@ export function useSignDetection(): UseSignDetectionReturn {
   const [currentSign, setCurrentSign] = useState<string | null>(null);
   const [landmarks, setLandmarks] = useState<NormalizedLandmark[][] | null>(null);
   const [bodyLandmarks, setBodyLandmarks] = useState<NormalizedLandmark[] | null>(null);
+  const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -60,6 +68,7 @@ export function useSignDetection(): UseSignDetectionReturn {
     setLandmarks(null);
     setBodyLandmarks(null);
     setCurrentSign(null);
+    setDebugInfo(null);
   }, []);
 
   const detectionLoop = useCallback((timestamp: number) => {
@@ -85,6 +94,12 @@ export function useSignDetection(): UseSignDetectionReturn {
           rightHandPos: result.rightHandPos,
           leftHandPos: result.leftHandPos,
           detectedFace: result.detectedFace,
+        });
+
+        setDebugInfo({
+          posY: matcher.lastPosY,
+          region: matcher.lastRegion,
+          candidates: matcher.lastCandidates,
         });
 
         if (matchResult) {
@@ -158,6 +173,7 @@ export function useSignDetection(): UseSignDetectionReturn {
     currentSign,
     landmarks,
     bodyLandmarks,
+    debugInfo,
     videoRef,
     startDetection,
     stopDetection,
