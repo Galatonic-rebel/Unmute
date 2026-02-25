@@ -171,15 +171,16 @@ export function SignAvatar({ currentWord, isRecording, signQueue, finalResult, i
             if (cur) {
               av.applySway(now);
               const elapsed = now - itemStartRef.current;
-              const frameDur = cur.holdMs * 0.65;
-              const blendIn = Math.min(elapsed / 120, 1);
-              const eased = blendIn < 1 ? blendIn * blendIn * (3 - 2 * blendIn) : 1;
-              const lerpT = Math.min(dt / 55, 1) * eased + Math.min(dt / 55, 1) * (1 - eased) * 0.3;
+              const frameDur = cur.holdMs * 0.55;
+              const blendIn = Math.min(elapsed / 80, 1);
+              const eased = blendIn * blendIn * (3 - 2 * blendIn);
+              const baseLerp = Math.min(dt / 35, 1);
+              const lerpT = baseLerp * (0.4 + 0.6 * eased);
               av.applyHandPose('right', cur.right, lerpT);
               av.applyHandPose('left', cur.left, lerpT);
               av.applyExpression(cur.face ?? NEUTRAL_FACE, lerpT);
 
-              const posT = Math.min(dt / 65, 1) * eased + Math.min(dt / 65, 1) * (1 - eased) * 0.3;
+              const posT = Math.min(dt / 40, 1) * (0.4 + 0.6 * eased);
               av.setHandTarget('right',
                 cur.right.posX ?? 0,
                 cur.right.posY ?? 0,

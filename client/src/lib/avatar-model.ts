@@ -417,16 +417,44 @@ export class AvatarController {
   applySway(time: number) {
     if (!this._loaded) return;
     const ts = time * 0.0006;
-    const swayAngle = Math.sin(ts) * 0.008 + Math.sin(ts * 1.7) * 0.003;
-    const breathAngle = Math.sin(ts * 0.72) * 0.006;
+
+    const swayY = Math.sin(ts * 0.85) * 0.012 + Math.sin(ts * 1.9) * 0.005;
+    const swayZ = Math.sin(ts * 0.65) * 0.006;
+    const breathX = Math.sin(ts * 0.72) * 0.010;
 
     for (let i = 0; i < this.spineBones.length; i++) {
       const bone = this.spineBones[i];
       const restQ = this.spineRestQuats[i].clone();
+      const d = i + 1;
       const swayQ = new THREE.Quaternion().setFromEuler(
-        new THREE.Euler(breathAngle / (i + 1), swayAngle / (i + 1), 0)
+        new THREE.Euler(breathX / d, swayY / d, swayZ / d)
       );
       bone.quaternion.copy(restQ.multiply(swayQ));
+    }
+
+    if (this.headBone && !this._animationPlaying) {
+      const headNod = Math.sin(ts * 1.1) * 0.008 + Math.sin(ts * 2.3) * 0.004;
+      const headTilt = Math.sin(ts * 0.55) * 0.006;
+      const headQ = new THREE.Quaternion().setFromEuler(
+        new THREE.Euler(headNod, 0, headTilt)
+      );
+      this.headBone.quaternion.multiply(headQ);
+    }
+
+    for (const side of ['left', 'right'] as const) {
+      const chain = this.armChains[side];
+      if (!chain || this._animationPlaying) continue;
+      const s = side === 'left' ? 1 : -1;
+      const armDrift = Math.sin(ts * 0.6 + s * 1.2) * 0.008;
+      const forearmDrift = Math.sin(ts * 0.9 + s * 0.8) * 0.006;
+      const armQ = new THREE.Quaternion().setFromEuler(
+        new THREE.Euler(armDrift, 0, forearmDrift * s)
+      );
+      const forearmQ = new THREE.Quaternion().setFromEuler(
+        new THREE.Euler(forearmDrift, 0, 0)
+      );
+      chain.arm.quaternion.multiply(armQ);
+      chain.forearm.quaternion.multiply(forearmQ);
     }
   }
 
