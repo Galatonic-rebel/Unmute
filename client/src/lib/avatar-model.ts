@@ -32,8 +32,8 @@ const SIGN_SIDE_X = 0.17;
 export class AvatarController {
   public root: THREE.Group;
   private bones = new Map<string, THREE.Bone>();
-  private morphMesh: THREE.SkinnedMesh | null = null;
-  private morphDict = new Map<string, number>();
+  private morphMeshes: THREE.SkinnedMesh[] = [];
+  private morphDicts: Map<string, number>[] = [];
   private restQuats = new Map<string, THREE.Quaternion>();
 
   private headBone: THREE.Bone | null = null;
@@ -75,16 +75,18 @@ export class AvatarController {
       }
       if (obj instanceof THREE.SkinnedMesh) {
         if (obj.morphTargetDictionary && Object.keys(obj.morphTargetDictionary).length > 0) {
-          this.morphMesh = obj;
+          const dict = new Map<string, number>();
           for (const [name, idx] of Object.entries(obj.morphTargetDictionary)) {
-            this.morphDict.set(name, idx);
+            dict.set(name, idx);
           }
+          this.morphMeshes.push(obj);
+          this.morphDicts.push(dict);
         }
         obj.castShadow = true;
         obj.receiveShadow = true;
         const mat = obj.material;
         if (mat instanceof THREE.MeshStandardMaterial) {
-          mat.envMapIntensity = 1.2;
+          mat.envMapIntensity = 1.8;
           mat.needsUpdate = true;
         }
       }
@@ -347,8 +349,7 @@ export class AvatarController {
   }
 
   applyExpression(expr: FaceExpression, t: number) {
-    if (!this.morphMesh || !this.morphMesh.morphTargetInfluences) return;
-    const infl = this.morphMesh.morphTargetInfluences;
+    if (this.morphMeshes.length === 0) return;
 
     const targets = new Map<string, number>();
 
@@ -386,15 +387,21 @@ export class AvatarController {
     targets.set('eyeBlinkLeft', sq);
     targets.set('eyeBlinkRight', sq);
 
-    for (const [name, target] of targets) {
-      const idx = this.morphDict.get(name);
-      if (idx === undefined) continue;
-      infl[idx] = infl[idx] + (target - infl[idx]) * t;
-    }
+    for (let mi = 0; mi < this.morphMeshes.length; mi++) {
+      const infl = this.morphMeshes[mi].morphTargetInfluences;
+      if (!infl) continue;
+      const dict = this.morphDicts[mi];
 
-    for (const [name, idx] of this.morphDict) {
-      if (!targets.has(name)) {
-        infl[idx] = infl[idx] * (1 - t * 0.5);
+      for (const [name, target] of targets) {
+        const idx = dict.get(name);
+        if (idx === undefined) continue;
+        infl[idx] = infl[idx] + (target - infl[idx]) * t;
+      }
+
+      for (const [name, idx] of dict) {
+        if (!targets.has(name)) {
+          infl[idx] = infl[idx] * (1 - t * 0.5);
+        }
       }
     }
 

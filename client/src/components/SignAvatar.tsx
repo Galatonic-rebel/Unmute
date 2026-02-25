@@ -87,9 +87,9 @@ export function SignAvatar({ currentWord, isRecording, signQueue, finalResult, i
         scene.environment = envRT.texture;
         pmremGen.dispose();
 
-        scene.add(new THREE.HemisphereLight(0xfff4e0, 0x2a2a3e, 1.0));
+        scene.add(new THREE.HemisphereLight(0xffffff, 0x4a4a5e, 1.4));
 
-        const key = new THREE.DirectionalLight(0xffecd0, 2.8);
+        const key = new THREE.DirectionalLight(0xffecd0, 3.5);
         key.position.set(-0.6, 2.0, 1.8);
         key.castShadow = true;
         key.shadow.mapSize.set(2048, 2048);
@@ -101,19 +101,19 @@ export function SignAvatar({ currentWord, isRecording, signQueue, finalResult, i
         key.shadow.bias   = -0.0003;
         scene.add(key);
 
-        const fill = new THREE.DirectionalLight(0xc0e0ff, 1.1);
+        const fill = new THREE.DirectionalLight(0xd0e8ff, 1.6);
         fill.position.set(1.5, 0.6, 1.0);
         scene.add(fill);
 
-        const rim = new THREE.DirectionalLight(0xffd080, 0.55);
+        const rim = new THREE.DirectionalLight(0xffd080, 0.8);
         rim.position.set(0, 0.8, -2.5);
         scene.add(rim);
 
-        const bounce = new THREE.DirectionalLight(0x9090ff, 0.25);
+        const bounce = new THREE.DirectionalLight(0xb0b0ff, 0.5);
         bounce.position.set(0, -1.5, 0.8);
         scene.add(bounce);
 
-        const face = new THREE.PointLight(0xffe8d8, 0.7, 3);
+        const face = new THREE.PointLight(0xffe8d8, 1.0, 3);
         face.position.set(0, 0.45, 0.9);
         scene.add(face);
 
@@ -170,12 +170,12 @@ export function SignAvatar({ currentWord, isRecording, signQueue, finalResult, i
             const cur = currentItemRef.current;
             if (cur) {
               av.applySway(now);
-              const lerpT = Math.min(dt / 65, 1);
+              const lerpT = Math.min(dt / 40, 1);
               av.applyHandPose('right', cur.right, lerpT);
               av.applyHandPose('left', cur.left, lerpT);
               av.applyExpression(cur.face ?? NEUTRAL_FACE, lerpT);
 
-              const posT = Math.min(dt / 70, 1);
+              const posT = Math.min(dt / 45, 1);
               av.setHandTarget('right',
                 cur.right.posX ?? 0,
                 cur.right.posY ?? 0,
@@ -189,7 +189,7 @@ export function SignAvatar({ currentWord, isRecording, signQueue, finalResult, i
                 posT
               );
 
-              if (now - itemStartRef.current >= cur.holdMs) {
+              if (now - itemStartRef.current >= cur.holdMs * 0.65) {
                 currentItemRef.current = null;
               }
             } else if (signingRef.current) {
