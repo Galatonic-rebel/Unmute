@@ -441,10 +441,15 @@ export class AvatarController {
     }
 
     if (this.headBone && !this._animationPlaying) {
-      const headNod = Math.sin(ts * 1.1) * 0.008 + Math.sin(ts * 2.3) * 0.004;
-      const headTilt = Math.sin(ts * 0.55) * 0.006;
+      const headNod = Math.sin(ts * 0.8) * 0.007
+                    + Math.sin(ts * 1.4) * 0.004
+                    + Math.sin(ts * 2.7) * 0.002;
+      const headTilt = Math.sin(ts * 0.42) * 0.005
+                     + Math.sin(ts * 1.15) * 0.003;
+      const headTurn = Math.sin(ts * 0.35) * 0.004
+                     + Math.sin(ts * 0.95) * 0.002;
       const headQ = new THREE.Quaternion().setFromEuler(
-        new THREE.Euler(headNod, 0, headTilt)
+        new THREE.Euler(headNod, headTurn, headTilt)
       );
       this.headBone.quaternion.multiply(headQ);
     }
@@ -467,12 +472,24 @@ export class AvatarController {
     }
   }
 
+  private _restoreBlend = 0;
+  private _restoring = false;
+
   private _restoreAfterAnimation() {
+    this._restoring = true;
+    this._restoreBlend = 0;
+  }
+
+  updateRestore(dt: number) {
+    if (!this._restoring) return;
+    this._restoreBlend = Math.min(this._restoreBlend + dt / 300, 1);
+    const t = this._restoreBlend * this._restoreBlend * (3 - 2 * this._restoreBlend);
     this.restQuats.forEach((restQ, name) => {
       if (!this._isSigningBone(name)) return;
       const bone = this.bones.get(name);
-      if (bone) bone.quaternion.copy(restQ.clone());
+      if (bone) bone.quaternion.slerp(restQ, t);
     });
+    if (this._restoreBlend >= 1) this._restoring = false;
   }
 
   private static readonly SIGN_BONES = new Set([

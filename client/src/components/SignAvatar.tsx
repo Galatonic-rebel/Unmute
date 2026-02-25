@@ -41,7 +41,8 @@ export function SignAvatar({ currentWord, isRecording, signQueue, finalResult, i
   const currentItemRef      = useRef<QueueItem | null>(null);
   const itemStartRef        = useRef<number>(0);
   const blinkTimerRef       = useRef<number>(0);
-  const nextBlinkRef        = useRef<number>(2800 + Math.random() * 3000);
+  const nextBlinkRef        = useRef<number>(1800 + Math.random() * 3000);
+  const blinkPhaseRef       = useRef<number>(999);
   const prevSignQueueRef    = useRef<string[] | undefined>(undefined);
   const abortRef            = useRef<AbortController | null>(null);
   const signingRef          = useRef<boolean>(false);
@@ -158,6 +159,7 @@ export function SignAvatar({ currentWord, isRecording, signQueue, finalResult, i
           if (!av || !av.isLoaded) return;
 
           av.updateMixer(dt / 1000);
+          av.updateRestore(dt);
 
           const animPlaying = av.isAnimationPlaying();
 
@@ -214,18 +216,14 @@ export function SignAvatar({ currentWord, isRecording, signQueue, finalResult, i
           blinkTimerRef.current += dt;
           if (blinkTimerRef.current >= nextBlinkRef.current) {
             blinkTimerRef.current = 0;
-            nextBlinkRef.current  = 2500 + Math.random() * 4500;
-            const doDouble = Math.random() < 0.2;
-            av.applyExpression({ ...NEUTRAL_FACE, eyeSquint: 1 }, 1);
-            setTimeout(() => {
-              av.applyExpression(NEUTRAL_FACE, 1);
-              if (doDouble) {
-                setTimeout(() => {
-                  av.applyExpression({ ...NEUTRAL_FACE, eyeSquint: 1 }, 1);
-                  setTimeout(() => av.applyExpression(NEUTRAL_FACE, 1), 90);
-                }, 180);
-              }
-            }, 105);
+            nextBlinkRef.current = 1800 + Math.random() * 3000;
+            blinkPhaseRef.current = 0;
+          }
+          if (blinkPhaseRef.current < 150) {
+            blinkPhaseRef.current += dt;
+            const bp = blinkPhaseRef.current;
+            const blinkVal = bp < 60 ? bp / 60 : bp < 90 ? 1 : 1 - (bp - 90) / 60;
+            av.applyExpression({ ...NEUTRAL_FACE, eyeSquint: Math.max(0, blinkVal) }, 0.85);
           }
 
           renderer.render(scene, camera);
