@@ -120,34 +120,39 @@ export function useSignDetection(): UseSignDetectionReturn {
   }, []);
 
   const startDetection = useCallback(async () => {
-    stopDetection();
+    try {
+      stopDetection();
 
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: "user" },
-    });
-    streamRef.current = stream;
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "user" },
+      });
+      streamRef.current = stream;
 
-    const video = videoRef.current;
-    if (!video) {
-      stream.getTracks().forEach((t) => t.stop());
-      return;
+      const video = videoRef.current;
+      if (!video) {
+        stream.getTracks().forEach((t) => t.stop());
+        return;
+      }
+
+      video.srcObject = stream;
+      await video.play();
+
+      const detector = new PoseDetector();
+      await detector.init(video);
+      detectorRef.current = detector;
+
+      matcherRef.current = new SignMatcher();
+
+      isDetectingRef.current = true;
+      setIsDetecting(true);
+      lastFrameTimeRef.current = 0;
+      debugTickRef.current = 0;
+
+      rafIdRef.current = requestAnimationFrame(detectionLoop);
+    } catch (err) {
+      stopDetection();
+      throw err;
     }
-
-    video.srcObject = stream;
-    await video.play();
-
-    const detector = new PoseDetector();
-    await detector.init(video);
-    detectorRef.current = detector;
-
-    matcherRef.current = new SignMatcher();
-
-    isDetectingRef.current = true;
-    setIsDetecting(true);
-    lastFrameTimeRef.current = 0;
-    debugTickRef.current = 0;
-
-    rafIdRef.current = requestAnimationFrame(detectionLoop);
   }, [stopDetection, detectionLoop]);
 
   const reset = useCallback(() => {

@@ -5,15 +5,18 @@ import { SignAvatar } from '@/components/SignAvatar';
 import { CameraFeed } from '@/components/CameraFeed';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Mic, Square, Loader2, AlertCircle, Hand, Camera, ArrowLeftRight } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import bgImage from '@assets/image_1771963051387.png';
 
 type AppMode = 'speech-to-sign' | 'sign-to-speech';
 
 export default function Home() {
+  const { toast } = useToast();
   const [mode, setMode] = useState<AppMode>('speech-to-sign');
   const [polishedSentence, setPolishedSentence] = useState('');
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isProcessingSpeech, setIsProcessingSpeech] = useState(false);
   const [signError, setSignError] = useState<string | null>(null);
 
   const {
@@ -77,6 +80,7 @@ export default function Home() {
   const handleSpeak = useCallback(async () => {
     if (recognizedWords.length === 0 || isSpeaking) return;
     setIsSpeaking(true);
+    setIsProcessingSpeech(true);
     try {
       const polishRes = await fetch('/api/polish-sentence', {
         method: 'POST',
@@ -97,6 +101,7 @@ export default function Home() {
       const audioBlob = await ttsRes.blob();
       const audioUrl = URL.createObjectURL(audioBlob);
       const audio = new Audio(audioUrl);
+      setIsProcessingSpeech(false);
       audio.onended = () => {
         setIsSpeaking(false);
         URL.revokeObjectURL(audioUrl);
@@ -109,8 +114,14 @@ export default function Home() {
     } catch (err) {
       console.error('Speak error:', err);
       setIsSpeaking(false);
+      setIsProcessingSpeech(false);
+      toast({
+        variant: 'destructive',
+        title: 'Speech Error',
+        description: err instanceof Error ? err.message : 'Failed to generate speech. Please try again.',
+      });
     }
-  }, [recognizedWords, isSpeaking]);
+  }, [recognizedWords, isSpeaking, toast]);
 
   const handleResetDetection = useCallback(() => {
     resetDetection();
@@ -181,6 +192,7 @@ export default function Home() {
                   debugInfo={debugInfo}
                   polishedSentence={polishedSentence}
                   isSpeaking={isSpeaking}
+                  isProcessingSpeech={isProcessingSpeech}
                   onSpeak={handleSpeak}
                   onReset={handleResetDetection}
                   videoRef={videoRef as React.RefObject<HTMLVideoElement>}

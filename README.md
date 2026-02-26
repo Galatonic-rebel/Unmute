@@ -12,6 +12,12 @@
 
 ---
 
+## Project Mission
+
+SignFlow exists to bridge the communication gap between Deaf and hearing communities. Over 70 million people worldwide use sign language as their primary language, yet most technology assumes spoken or written communication. By combining real-time computer vision, 3D avatar animation, and AI-powered natural language processing — all running directly in the browser — SignFlow makes two-way ASL translation accessible to anyone with a webcam and an internet connection. No downloads, no specialized hardware, no barriers. Our goal is to demonstrate that inclusive, accessible communication technology can be built with modern web standards and open-source tools, lowering the cost and complexity of assistive technology while preserving the expressive richness of sign language.
+
+---
+
 ## Features
 
 - **Speech to ASL** -- Speak into your microphone and watch a photorealistic 3D avatar perform ASL signs in real time, powered by Deepgram live transcription and a 500+ word pose dictionary with FBX motion-capture animations.
@@ -223,6 +229,28 @@ Arms are scaled (0.92/0.93) to prevent self-intersection, and shoulders are perm
 ### Calibration System
 
 Per-sign calibration offsets (`CALIBRATION_OFFSETS`) bias common, high-priority signs like "hello" (-0.10), "thank you" (-0.07) to be recognized more easily. Signs with calibration get preferential re-ranking: if a calibrated sign is within 0.08 distance of the uncalibrated top candidate, it gets promoted to first place.
+
+---
+
+## Implementation Challenges
+
+### Challenge: Real-time Multi-Model Vision Pipeline
+
+Running three MediaPipe models (HandLandmarker, PoseLandmarker, FaceLandmarker) simultaneously in the browser is computationally expensive and can easily drop below interactive frame rates. Naive sequential execution on the CPU produces ~3 fps, far too slow for real-time sign recognition.
+
+**Solution:** All three models are initialized with `delegate: "GPU"` to leverage WebGL-accelerated inference. The detection loop is driven by `requestAnimationFrame` with a 15 fps throttle (`FRAME_INTERVAL = 1000 / 15`) to cap GPU utilization while maintaining smooth recognition. Critically, landmark data is written directly to React refs (`landmarksRef`, `bodyLandmarksRef`) instead of state, so the ~15 Hz detection cycle never triggers React re-renders. Only discrete recognition events (a new word confirmed after stability filtering) cause state updates. This ref-based rendering architecture keeps the React reconciler idle during the hot path while Three.js reads landmark data synchronously from refs each render frame.
+
+### Challenge: Body-Relative Sign Position Normalization
+
+Different signers sit at varying distances from the camera, making absolute pixel coordinates for hand position useless for sign discrimination. A hand at "chin height" for a close signer occupies a completely different vertical pixel than for a distant signer.
+
+**Solution:** The `computeHandRelativePos` function uses PoseLandmarker's 33-point body skeleton to establish a body-relative coordinate system. The shoulder midpoint serves as the lateral/depth origin, and vertical position is mapped through a piecewise-linear function anchored to anatomical landmarks (forehead, eyes, nose, mouth, chin, shoulders, hips). This produces a normalized `posY` value (e.g., 0.68 = forehead, 0.40 = chin, 0.12 = chest) that is invariant to camera distance and signer height. Shoulder width provides the lateral normalization scale, and shoulder-to-hand depth difference yields a distance-invariant `posZ`.
+
+### Challenge: Temporal Disambiguation of Similar Signs
+
+Many ASL signs share nearly identical hand shapes but differ in spatial position (e.g., "my" is a flat hand on the chest, "want" is an open hand pulled toward the body). Single-frame classification produces frequent false positives because hand shape alone cannot distinguish these signs.
+
+**Solution:** The `SignMatcher` employs a multi-layered disambiguation strategy: (1) **Multi-feature weighted distance** combines handshape (25%), body-relative position (60%), and facial expression (15%) into a single metric, heavily weighting spatial position. (2) **Two-tier region pre-filtering** skips candidates whose expected signing region differs by more than one level from the detected hand region, reducing the candidate set before expensive distance computation. (3) **Temporal stability** requires a sign to be the top candidate for 10 consecutive frames (4 frames for high-confidence matches below 50% of the threshold) before firing a recognition event. (4) **Per-sign calibration offsets** bias commonly-used signs (e.g., "hello" at -0.10) for easier recognition, with re-ranking logic that promotes calibrated signs within a 0.08 margin of the uncalibrated top candidate. (5) **Context-aware bigram priors** model common ASL phrase patterns (e.g., after "hello", "my" gets a -0.04 distance bonus) to resolve ambiguity between signs that are similar in both shape and position.
 
 ---
 

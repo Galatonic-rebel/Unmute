@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Volume2, Trash2, Bug } from 'lucide-react';
+import { Volume2, Trash2, Bug, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import type { NormalizedLandmark } from '@mediapipe/tasks-vision';
@@ -14,6 +14,7 @@ interface CameraFeedProps {
   debugInfo: DebugInfo | null;
   polishedSentence: string;
   isSpeaking: boolean;
+  isProcessingSpeech: boolean;
   onSpeak: () => void;
   onReset: () => void;
   videoRef: React.RefObject<HTMLVideoElement>;
@@ -45,6 +46,7 @@ export function CameraFeed({
   debugInfo,
   polishedSentence,
   isSpeaking,
+  isProcessingSpeech,
   onSpeak,
   onReset,
   videoRef,
@@ -253,15 +255,32 @@ export function CameraFeed({
         {recognizedWords.length > 0 && (
           <>
             <Button
-              size="icon"
               variant="ghost"
               onClick={onSpeak}
               disabled={isSpeaking}
-              className="text-white/70"
+              className="text-white/70 gap-1.5"
               data-testid="button-speak"
-              aria-label={isSpeaking ? 'Speaking recognized signs aloud' : 'Speak recognized signs aloud'}
+              aria-label={
+                isProcessingSpeech
+                  ? 'Processing speech — please wait'
+                  : isSpeaking
+                    ? 'Speaking recognized signs aloud'
+                    : 'Speak recognized signs aloud'
+              }
             >
-              <Volume2 />
+              {isProcessingSpeech ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span className="text-xs">Processing…</span>
+                </>
+              ) : isSpeaking ? (
+                <>
+                  <Volume2 className="w-4 h-4 animate-pulse" />
+                  <span className="text-xs">Speaking…</span>
+                </>
+              ) : (
+                <Volume2 className="w-4 h-4" />
+              )}
             </Button>
             <Button
               size="icon"

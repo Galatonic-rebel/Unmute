@@ -339,7 +339,7 @@ export class AvatarController {
     const prefix = side === 'left' ? 'Left' : 'Right';
 
     for (const [poseFinger, boneFinger] of Object.entries(FINGER_MAP)) {
-      const fp = (pose as any)[poseFinger] as { curl: number; spread: number };
+      const fp = pose[poseFinger as keyof Pick<HandPose, 'index' | 'middle' | 'ring' | 'pinky'>];
       this._applyFingerBones(prefix, boneFinger, fp.curl, fp.spread, t);
     }
 

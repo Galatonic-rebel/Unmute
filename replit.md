@@ -90,6 +90,9 @@ The project uses a single-repo layout with three top-level directories:
 - **Error Boundary**: `client/src/components/ErrorBoundary.tsx` wraps SignAvatar and CameraFeed components for graceful failure recovery.
 - **Accessibility**: ARIA labels, roles, live regions, and focus-visible styles on all interactive elements in Home.tsx, CameraFeed.tsx, and SignAvatar.tsx.
 - **Security**: Security headers middleware and per-IP rate limiting (100 req/60s) on API routes in `server/index.ts`. No external packages used.
+- **Type Safety**: Zero `any` types in core files — all replaced with precise interfaces (`AudioChatMessage`, `PoseLandmarkerResult`, `keyof HandPose`).
+- **Error UX**: All async failures surface user-facing toast notifications (speech, TTS, translation save). Camera errors display in-page alert.
+- **HTML Meta**: Title, description, OG tags, theme-color in `client/index.html`. Google Fonts trimmed to Inter + Outfit only.
 - **LICENSE**: MIT license in project root.
 
 ### Dark Theme

@@ -4,6 +4,8 @@ import {
   FaceLandmarker,
   FilesetResolver,
   type NormalizedLandmark,
+  type PoseLandmarkerResult,
+  type FaceLandmarkerResult,
 } from "@mediapipe/tasks-vision";
 import type { HandPose, FaceExpression } from "./asl-poses";
 
@@ -324,10 +326,10 @@ function computeHandRelativePos(
   const lateralOffset = (shoulderMidX - handWrist.x) / scale;
   const posX = lateralOffset * 0.15;
 
-  const lsZ = (lShoulder as any).z ?? 0;
-  const rsZ = (rShoulder as any).z ?? 0;
+  const lsZ = lShoulder.z ?? 0;
+  const rsZ = rShoulder.z ?? 0;
   const shoulderMidZ = (lsZ + rsZ) / 2;
-  const handZ = (handWrist as any).z ?? 0;
+  const handZ = handWrist.z ?? 0;
   const depthDiff = shoulderMidZ - handZ;
   const posZ = Math.max(-0.1, Math.min(0.2, depthDiff * 0.3));
 
@@ -476,14 +478,14 @@ export class PoseDetector {
 
     const handResult = this.handLandmarker.detectForVideo(video, timestamp);
 
-    let poseResult: any = null;
+    let poseResult: PoseLandmarkerResult | null = null;
     if (this.poseLandmarker) {
       try {
         poseResult = this.poseLandmarker.detectForVideo(video, timestamp + 0.1);
       } catch (_) {}
     }
 
-    let faceResult: any = null;
+    let faceResult: FaceLandmarkerResult | null = null;
     if (this.faceLandmarker) {
       try {
         faceResult = this.faceLandmarker.detectForVideo(video, timestamp + 0.2);

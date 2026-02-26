@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl, type TranslationInput } from "@shared/routes";
+import { useToast } from "@/hooks/use-toast";
 
 export function useTranslations() {
   return useQuery({
@@ -14,6 +15,7 @@ export function useTranslations() {
 
 export function useCreateTranslation() {
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   return useMutation({
     mutationFn: async (data: TranslationInput) => {
       const res = await fetch(api.translations.create.path, {
@@ -27,6 +29,13 @@ export function useCreateTranslation() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.translations.list.path] });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Translation Error",
+        description: error.message || "Failed to save translation. Please try again.",
+      });
     },
   });
 }

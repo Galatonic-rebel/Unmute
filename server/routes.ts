@@ -151,7 +151,10 @@ export async function registerRoutes(
         ],
       });
 
-      const audioData = (response.choices[0]?.message as any)?.audio?.data ?? "";
+      interface AudioChatMessage {
+        audio?: { data?: string };
+      }
+      const audioData = (response.choices[0]?.message as AudioChatMessage)?.audio?.data ?? "";
       if (!audioData) {
         return res.status(500).json({ message: "No audio generated" });
       }
