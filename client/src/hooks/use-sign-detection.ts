@@ -16,8 +16,8 @@ export interface UseSignDetectionReturn {
   isDetecting: boolean;
   recognizedWords: string[];
   currentSign: string | null;
-  landmarks: NormalizedLandmark[][] | null;
-  bodyLandmarks: NormalizedLandmark[] | null;
+  landmarksRef: React.RefObject<NormalizedLandmark[][] | null>;
+  bodyLandmarksRef: React.RefObject<NormalizedLandmark[] | null>;
   debugInfo: DebugInfo | null;
   videoRef: React.RefObject<HTMLVideoElement | null>;
   startDetection: () => Promise<void>;
@@ -29,9 +29,10 @@ export function useSignDetection(): UseSignDetectionReturn {
   const [isDetecting, setIsDetecting] = useState(false);
   const [recognizedWords, setRecognizedWords] = useState<string[]>([]);
   const [currentSign, setCurrentSign] = useState<string | null>(null);
-  const [landmarks, setLandmarks] = useState<NormalizedLandmark[][] | null>(null);
-  const [bodyLandmarks, setBodyLandmarks] = useState<NormalizedLandmark[] | null>(null);
   const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
+
+  const landmarksRef = useRef<NormalizedLandmark[][] | null>(null);
+  const bodyLandmarksRef = useRef<NormalizedLandmark[] | null>(null);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -40,6 +41,7 @@ export function useSignDetection(): UseSignDetectionReturn {
   const rafIdRef = useRef<number | null>(null);
   const lastFrameTimeRef = useRef(0);
   const isDetectingRef = useRef(false);
+  const debugTickRef = useRef(0);
 
   const stopDetection = useCallback(() => {
     isDetectingRef.current = false;
@@ -65,8 +67,8 @@ export function useSignDetection(): UseSignDetectionReturn {
     }
 
     matcherRef.current = null;
-    setLandmarks(null);
-    setBodyLandmarks(null);
+    landmarksRef.current = null;
+    bodyLandmarksRef.current = null;
     setCurrentSign(null);
     setDebugInfo(null);
   }, []);
@@ -85,8 +87,8 @@ export function useSignDetection(): UseSignDetectionReturn {
       if (video && detector && matcher && video.readyState >= 2) {
         const result: DetectionResult = detector.detect(video);
 
-        setLandmarks(result.landmarks);
-        setBodyLandmarks(result.bodyLandmarks);
+        landmarksRef.current = result.landmarks;
+        bodyLandmarksRef.current = result.bodyLandmarks;
 
         const matchResult = matcher.match({
           right: result.right,
@@ -96,11 +98,14 @@ export function useSignDetection(): UseSignDetectionReturn {
           detectedFace: result.detectedFace,
         });
 
-        setDebugInfo({
-          posY: matcher.lastPosY,
-          region: matcher.lastRegion,
-          candidates: matcher.lastCandidates,
-        });
+        debugTickRef.current++;
+        if (debugTickRef.current % 3 === 0) {
+          setDebugInfo({
+            posY: matcher.lastPosY,
+            region: matcher.lastRegion,
+            candidates: matcher.lastCandidates,
+          });
+        }
 
         if (matchResult) {
           setCurrentSign(matchResult.word);
@@ -140,6 +145,7 @@ export function useSignDetection(): UseSignDetectionReturn {
     isDetectingRef.current = true;
     setIsDetecting(true);
     lastFrameTimeRef.current = 0;
+    debugTickRef.current = 0;
 
     rafIdRef.current = requestAnimationFrame(detectionLoop);
   }, [stopDetection, detectionLoop]);
@@ -171,8 +177,8 @@ export function useSignDetection(): UseSignDetectionReturn {
     isDetecting,
     recognizedWords,
     currentSign,
-    landmarks,
-    bodyLandmarks,
+    landmarksRef,
+    bodyLandmarksRef,
     debugInfo,
     videoRef,
     startDetection,

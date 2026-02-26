@@ -32,8 +32,8 @@ export default function Home() {
     isDetecting,
     recognizedWords,
     currentSign,
-    landmarks,
-    bodyLandmarks,
+    landmarksRef,
+    bodyLandmarksRef,
     debugInfo,
     videoRef,
     startDetection,
@@ -164,8 +164,8 @@ export default function Home() {
                 isDetecting={isDetecting}
                 currentSign={currentSign}
                 recognizedWords={recognizedWords}
-                landmarks={landmarks}
-                bodyLandmarks={bodyLandmarks}
+                landmarksRef={landmarksRef}
+                bodyLandmarksRef={bodyLandmarksRef}
                 debugInfo={debugInfo}
                 polishedSentence={polishedSentence}
                 isSpeaking={isSpeaking}

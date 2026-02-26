@@ -22,9 +22,51 @@ export interface FullMatchInput {
   detectedFace: FaceExpression | null;
 }
 
-const CONFIDENCE_THRESHOLD = 0.35;
+const CONFIDENCE_THRESHOLD = 0.40;
 const STABILITY_FRAMES = 10;
-const COOLDOWN_FRAMES = 15;
+const COOLDOWN_FRAMES = 10;
+const HIGH_CONFIDENCE_RATIO = 0.45;
+const HIGH_CONFIDENCE_STABILITY = 5;
+
+const CALIBRATION_OFFSETS: Record<string, number> = {
+  hello: -0.065,
+  my: -0.055,
+  name: -0.060,
+  nice: -0.055,
+  meet: -0.060,
+  you: -0.050,
+  please: -0.045,
+  "thank you": -0.050,
+  thanks: -0.050,
+  help: -0.045,
+  good: -0.040,
+  sorry: -0.045,
+  yes: -0.040,
+  no: -0.040,
+  love: -0.040,
+  want: -0.035,
+  need: -0.035,
+  understand: -0.035,
+  friend: -0.035,
+  family: -0.030,
+  water: -0.035,
+  food: -0.030,
+  home: -0.030,
+};
+
+const CONTEXT_PRIOR: Record<string, Record<string, number>> = {
+  hello: { my: -0.025, nice: -0.020, you: -0.015 },
+  my: { name: -0.030, friend: -0.015, family: -0.015, home: -0.010 },
+  name: { nice: -0.020, you: -0.015 },
+  nice: { meet: -0.030, "thank you": -0.015 },
+  meet: { you: -0.030 },
+  "thank you": { you: -0.015 },
+  please: { help: -0.020 },
+  i: { love: -0.020, need: -0.015, want: -0.015, understand: -0.015 },
+  love: { you: -0.025, my: -0.015 },
+  good: { morning: -0.015 },
+  sorry: { please: -0.015 },
+};
 
 function handShapeDistance(detected: HandPose, reference: HandPose): number {
   let totalWeight = 0;
@@ -140,6 +182,7 @@ export class SignMatcher {
   private stableCount = 0;
   private cooldownCounter = 0;
   private lastRecognized: string | null = null;
+  private recentContext: string | null = null;
   public lastCandidates: MatchCandidate[] = [];
   public lastRegion: string = "";
   public lastPosY: number = 0;
@@ -179,7 +222,10 @@ export class SignMatcher {
       } else if (dominantPos && detRegionIdx === 2) {
         shapeDist += 0.05;
       }
-      candidates.push({ word: letter, distance: shapeDist, shapeDist, posDist: 0 });
+      const calibration = CALIBRATION_OFFSETS[letter] ?? 0;
+      const contextBoost = this.getContextBoost(letter);
+      const finalDist = Math.max(0, shapeDist + calibration + contextBoost);
+      candidates.push({ word: letter, distance: finalDist, shapeDist, posDist: 0 });
     }
 
     for (const [word, sign] of Object.entries(WORD_SIGNS)) {
@@ -218,6 +264,10 @@ export class SignMatcher {
         }
       }
 
+      const calibration = CALIBRATION_OFFSETS[word] ?? 0;
+      const contextBoost = this.getContextBoost(word);
+      dist = Math.max(0, dist + calibration + contextBoost);
+
       candidates.push({ word, distance: dist, shapeDist, posDist });
     }
 
@@ -240,8 +290,13 @@ export class SignMatcher {
       this.stableCount = 1;
     }
 
-    if (this.stableCount >= STABILITY_FRAMES) {
+    const requiredFrames = best.distance < CONFIDENCE_THRESHOLD * HIGH_CONFIDENCE_RATIO
+      ? HIGH_CONFIDENCE_STABILITY
+      : STABILITY_FRAMES;
+
+    if (this.stableCount >= requiredFrames) {
       if (best.word !== this.lastRecognized || this.cooldownCounter === 0) {
+        this.recentContext = best.word;
         this.lastRecognized = best.word;
         this.cooldownCounter = COOLDOWN_FRAMES;
         this.stableCount = 0;
@@ -252,11 +307,19 @@ export class SignMatcher {
     return null;
   }
 
+  private getContextBoost(candidate: string): number {
+    if (!this.recentContext) return 0;
+    const priors = CONTEXT_PRIOR[this.recentContext];
+    if (!priors) return 0;
+    return priors[candidate] ?? 0;
+  }
+
   reset(): void {
     this.stableSign = null;
     this.stableCount = 0;
     this.cooldownCounter = 0;
     this.lastRecognized = null;
+    this.recentContext = null;
     this.lastCandidates = [];
     this.lastRegion = "";
     this.lastPosY = 0;

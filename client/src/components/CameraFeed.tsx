@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Volume2, Trash2, Bug } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -9,8 +9,8 @@ interface CameraFeedProps {
   isDetecting: boolean;
   currentSign: string | null;
   recognizedWords: string[];
-  landmarks: NormalizedLandmark[][] | null;
-  bodyLandmarks: NormalizedLandmark[] | null;
+  landmarksRef: React.RefObject<NormalizedLandmark[][] | null>;
+  bodyLandmarksRef: React.RefObject<NormalizedLandmark[] | null>;
   debugInfo: DebugInfo | null;
   polishedSentence: string;
   isSpeaking: boolean;
@@ -40,8 +40,8 @@ export function CameraFeed({
   isDetecting,
   currentSign,
   recognizedWords,
-  landmarks,
-  bodyLandmarks,
+  landmarksRef,
+  bodyLandmarksRef,
   debugInfo,
   polishedSentence,
   isSpeaking,
@@ -53,125 +53,111 @@ export function CameraFeed({
   const rafRef = useRef<number>(0);
   const [showDebug, setShowDebug] = useState(false);
 
-  const drawOverlay = useCallback(() => {
-    const canvas = canvasRef.current;
-    const video = videoRef.current;
-    if (!canvas || !video) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const w = canvas.clientWidth;
-    const h = canvas.clientHeight;
-    if (canvas.width !== w || canvas.height !== h) {
-      canvas.width = w;
-      canvas.height = h;
-    }
-
-    ctx.clearRect(0, 0, w, h);
-
-    if (bodyLandmarks && bodyLandmarks.length >= 25) {
-      ctx.strokeStyle = 'rgba(255, 200, 50, 0.6)';
-      ctx.lineWidth = 2;
-      for (const [a, b] of BODY_CONNECTIONS) {
-        const p1 = bodyLandmarks[a];
-        const p2 = bodyLandmarks[b];
-        if (!p1 || !p2) continue;
-        const x1 = (1 - p1.x) * w;
-        const y1 = p1.y * h;
-        const x2 = (1 - p2.x) * w;
-        const y2 = p2.y * h;
-        ctx.beginPath();
-        ctx.moveTo(x1, y1);
-        ctx.lineTo(x2, y2);
-        ctx.stroke();
-      }
-
-      ctx.fillStyle = 'rgba(255, 200, 50, 0.5)';
-      const bodyPoints = [11, 12, 13, 14, 15, 16, 23, 24];
-      for (const idx of bodyPoints) {
-        const pt = bodyLandmarks[idx];
-        if (!pt) continue;
-        const x = (1 - pt.x) * w;
-        const y = pt.y * h;
-        ctx.beginPath();
-        ctx.arc(x, y, 3, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      const nose = bodyLandmarks[0];
-      if (nose) {
-        ctx.strokeStyle = 'rgba(100, 200, 255, 0.4)';
-        ctx.lineWidth = 1;
-        ctx.setLineDash([4, 4]);
-        const noseX = (1 - nose.x) * w;
-        const noseY = nose.y * h;
-        ctx.beginPath();
-        ctx.arc(noseX, noseY, 30, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.setLineDash([]);
-      }
-    }
-
-    if (landmarks) {
-      const hands = Array.isArray(landmarks) ? landmarks : [landmarks];
-
-      for (const hand of hands) {
-        if (!hand || !Array.isArray(hand) || hand.length < 21) continue;
-
-        ctx.strokeStyle = 'cyan';
-        ctx.lineWidth = 2;
-        for (const [a, b] of HAND_CONNECTIONS) {
-          const p1 = hand[a];
-          const p2 = hand[b];
-          if (!p1 || !p2) continue;
-          const x1 = (1 - p1.x) * w;
-          const y1 = p1.y * h;
-          const x2 = (1 - p2.x) * w;
-          const y2 = p2.y * h;
-          ctx.beginPath();
-          ctx.moveTo(x1, y1);
-          ctx.lineTo(x2, y2);
-          ctx.stroke();
-        }
-
-        ctx.fillStyle = '#22c55e';
-        for (const pt of hand) {
-          if (!pt) continue;
-          const x = (1 - pt.x) * w;
-          const y = pt.y * h;
-          ctx.beginPath();
-          ctx.arc(x, y, 4, 0, Math.PI * 2);
-          ctx.fill();
-        }
-      }
-    }
-  }, [landmarks, bodyLandmarks, videoRef]);
-
   useEffect(() => {
-    let active = true;
-
-    const loop = () => {
-      if (!active) return;
-      drawOverlay();
-      rafRef.current = requestAnimationFrame(loop);
-    };
-
-    if (landmarks || bodyLandmarks) {
-      rafRef.current = requestAnimationFrame(loop);
-    } else {
+    if (!isDetecting) {
       const canvas = canvasRef.current;
       if (canvas) {
         const ctx = canvas.getContext('2d');
         if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
       }
+      cancelAnimationFrame(rafRef.current);
+      return;
     }
+
+    let active = true;
+
+    const draw = () => {
+      if (!active) return;
+
+      const canvas = canvasRef.current;
+      const video = videoRef.current;
+      if (canvas && video) {
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          const w = canvas.clientWidth;
+          const h = canvas.clientHeight;
+          if (canvas.width !== w || canvas.height !== h) {
+            canvas.width = w;
+            canvas.height = h;
+          }
+
+          ctx.clearRect(0, 0, w, h);
+
+          const body = bodyLandmarksRef.current;
+          if (body && body.length >= 25) {
+            ctx.strokeStyle = 'rgba(255, 200, 50, 0.6)';
+            ctx.lineWidth = 2;
+            for (const [a, b] of BODY_CONNECTIONS) {
+              const p1 = body[a];
+              const p2 = body[b];
+              if (!p1 || !p2) continue;
+              ctx.beginPath();
+              ctx.moveTo((1 - p1.x) * w, p1.y * h);
+              ctx.lineTo((1 - p2.x) * w, p2.y * h);
+              ctx.stroke();
+            }
+
+            ctx.fillStyle = 'rgba(255, 200, 50, 0.5)';
+            for (const idx of [11, 12, 13, 14, 15, 16, 23, 24]) {
+              const pt = body[idx];
+              if (!pt) continue;
+              ctx.beginPath();
+              ctx.arc((1 - pt.x) * w, pt.y * h, 3, 0, Math.PI * 2);
+              ctx.fill();
+            }
+
+            const nose = body[0];
+            if (nose) {
+              ctx.strokeStyle = 'rgba(100, 200, 255, 0.4)';
+              ctx.lineWidth = 1;
+              ctx.setLineDash([4, 4]);
+              ctx.beginPath();
+              ctx.arc((1 - nose.x) * w, nose.y * h, 30, 0, Math.PI * 2);
+              ctx.stroke();
+              ctx.setLineDash([]);
+            }
+          }
+
+          const hands = landmarksRef.current;
+          if (hands) {
+            const handList = Array.isArray(hands) ? hands : [hands];
+            for (const hand of handList) {
+              if (!hand || !Array.isArray(hand) || hand.length < 21) continue;
+
+              ctx.strokeStyle = 'cyan';
+              ctx.lineWidth = 2;
+              for (const [a, b] of HAND_CONNECTIONS) {
+                const p1 = hand[a];
+                const p2 = hand[b];
+                if (!p1 || !p2) continue;
+                ctx.beginPath();
+                ctx.moveTo((1 - p1.x) * w, p1.y * h);
+                ctx.lineTo((1 - p2.x) * w, p2.y * h);
+                ctx.stroke();
+              }
+
+              ctx.fillStyle = '#22c55e';
+              for (const pt of hand) {
+                if (!pt) continue;
+                ctx.beginPath();
+                ctx.arc((1 - pt.x) * w, pt.y * h, 4, 0, Math.PI * 2);
+                ctx.fill();
+              }
+            }
+          }
+        }
+      }
+
+      rafRef.current = requestAnimationFrame(draw);
+    };
+
+    rafRef.current = requestAnimationFrame(draw);
 
     return () => {
       active = false;
       cancelAnimationFrame(rafRef.current);
     };
-  }, [landmarks, bodyLandmarks, drawOverlay]);
+  }, [isDetecting, videoRef, landmarksRef, bodyLandmarksRef]);
 
   return (
     <div

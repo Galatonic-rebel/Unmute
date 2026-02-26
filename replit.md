@@ -43,9 +43,9 @@ The project uses a single-repo layout with three top-level directories:
   - **Animation pipeline**: Word FBX → pose queue fallback → fingerspell via letter FBXs. ClampWhenFinished holds poses between words. Crossfade duration: 0.45s.
 - **Computer Vision** (ASL → Speech mode):
   - `pose-detector.ts` — MediaPipe integration with **three models**: HandLandmarker (21 hand landmarks per hand), PoseLandmarker (33 body landmarks for arm/shoulder/head positions), FaceLandmarker (blend shapes for facial expressions). Computes hand position relative to body (posX/posY/posZ using shoulder midpoint as origin) and maps face blend shapes to FaceExpression interface.
-  - `sign-matcher.ts` — Multi-feature sign matching: handshape distance (35%), position distance (50%), face expression distance (15%). Two-tier matching: first filters by position region (forehead/face/chin/chest/low), then ranks by combined distance. Temporal stability (8 frames) + cooldown (15 frames).
-  - `use-sign-detection.ts` — React hook managing webcam stream and detection loop at ~15fps. Passes full detection result (hand poses + positions + face) to matcher.
-  - `CameraFeed.tsx` — Camera feed component with hand landmark overlay (cyan), body skeleton overlay (yellow), head circle (blue), recognized signs display, speak/clear controls.
+  - `sign-matcher.ts` — Multi-feature sign matching: handshape distance (25%), position distance (60%), face expression distance (15%). Two-tier matching: first filters by position region (forehead/face/chin/chest/low), then ranks by combined distance. Temporal stability (10 frames, 5 for high-confidence) + cooldown (10 frames). Per-sign calibration offsets and context-based bigram priors for improved recognition of common phrases.
+  - `use-sign-detection.ts` — React hook managing webcam stream and detection loop at ~15fps. Landmarks stored in refs (not state) to avoid re-render overhead. Passes full detection result (hand poses + positions + face) to matcher.
+  - `CameraFeed.tsx` — Camera feed component with hand landmark overlay (cyan), body skeleton overlay (yellow), head circle (blue). Reads landmark data from refs in a stable RAF loop gated on isDetecting for smooth rendering.
 - **Path aliases**: `@/` maps to `client/src/`, `@shared/` maps to `shared/`
 
 ### Backend (`server/`)
