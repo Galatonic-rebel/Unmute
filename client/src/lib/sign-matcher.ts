@@ -29,12 +29,12 @@ const HIGH_CONFIDENCE_RATIO = 0.45;
 const HIGH_CONFIDENCE_STABILITY = 5;
 
 const CALIBRATION_OFFSETS: Record<string, number> = {
-  hello: -0.065,
-  my: -0.055,
-  name: -0.060,
-  nice: -0.055,
-  meet: -0.060,
-  you: -0.050,
+  hello: -0.070,
+  my: -0.075,
+  name: -0.070,
+  nice: -0.060,
+  meet: -0.065,
+  you: -0.055,
   please: -0.045,
   "thank you": -0.050,
   thanks: -0.050,
@@ -44,8 +44,6 @@ const CALIBRATION_OFFSETS: Record<string, number> = {
   yes: -0.040,
   no: -0.040,
   love: -0.040,
-  want: -0.035,
-  need: -0.035,
   understand: -0.035,
   friend: -0.035,
   family: -0.030,
@@ -55,11 +53,11 @@ const CALIBRATION_OFFSETS: Record<string, number> = {
 };
 
 const CONTEXT_PRIOR: Record<string, Record<string, number>> = {
-  hello: { my: -0.025, nice: -0.020, you: -0.015 },
-  my: { name: -0.030, friend: -0.015, family: -0.015, home: -0.010 },
-  name: { nice: -0.020, you: -0.015 },
-  nice: { meet: -0.030, "thank you": -0.015 },
-  meet: { you: -0.030 },
+  hello: { my: -0.030, nice: -0.020, you: -0.015 },
+  my: { name: -0.040, friend: -0.015, family: -0.015, home: -0.010 },
+  name: { nice: -0.025, you: -0.015 },
+  nice: { meet: -0.035, "thank you": -0.015 },
+  meet: { you: -0.035 },
   "thank you": { you: -0.015 },
   please: { help: -0.020 },
   i: { love: -0.020, need: -0.015, want: -0.015, understand: -0.015 },
