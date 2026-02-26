@@ -22,48 +22,49 @@ export interface FullMatchInput {
   detectedFace: FaceExpression | null;
 }
 
-const CONFIDENCE_THRESHOLD = 0.40;
+const CONFIDENCE_THRESHOLD = 0.42;
 const STABILITY_FRAMES = 10;
-const COOLDOWN_FRAMES = 10;
-const HIGH_CONFIDENCE_RATIO = 0.45;
-const HIGH_CONFIDENCE_STABILITY = 5;
+const COOLDOWN_FRAMES = 8;
+const HIGH_CONFIDENCE_RATIO = 0.50;
+const HIGH_CONFIDENCE_STABILITY = 4;
+const RERANK_MARGIN = 0.08;
 
 const CALIBRATION_OFFSETS: Record<string, number> = {
-  hello: -0.070,
-  my: -0.075,
-  name: -0.070,
-  nice: -0.060,
-  meet: -0.065,
-  you: -0.055,
-  please: -0.045,
-  "thank you": -0.050,
-  thanks: -0.050,
-  help: -0.045,
-  good: -0.040,
-  sorry: -0.045,
-  yes: -0.040,
-  no: -0.040,
-  love: -0.040,
-  understand: -0.035,
-  friend: -0.035,
-  family: -0.030,
-  water: -0.035,
-  food: -0.030,
-  home: -0.030,
+  hello: -0.10,
+  my: -0.10,
+  name: -0.10,
+  nice: -0.08,
+  meet: -0.09,
+  you: -0.08,
+  please: -0.06,
+  "thank you": -0.07,
+  thanks: -0.07,
+  help: -0.06,
+  good: -0.06,
+  sorry: -0.06,
+  yes: -0.05,
+  no: -0.05,
+  love: -0.06,
+  understand: -0.04,
+  friend: -0.04,
+  family: -0.04,
+  water: -0.04,
+  food: -0.04,
+  home: -0.04,
 };
 
 const CONTEXT_PRIOR: Record<string, Record<string, number>> = {
-  hello: { my: -0.030, nice: -0.020, you: -0.015 },
-  my: { name: -0.040, friend: -0.015, family: -0.015, home: -0.010 },
-  name: { nice: -0.025, you: -0.015 },
-  nice: { meet: -0.035, "thank you": -0.015 },
-  meet: { you: -0.035 },
-  "thank you": { you: -0.015 },
-  please: { help: -0.020 },
-  i: { love: -0.020, need: -0.015, want: -0.015, understand: -0.015 },
-  love: { you: -0.025, my: -0.015 },
-  good: { morning: -0.015 },
-  sorry: { please: -0.015 },
+  hello: { my: -0.04, nice: -0.03, you: -0.02 },
+  my: { name: -0.05, friend: -0.02, family: -0.02, home: -0.02 },
+  name: { nice: -0.03, you: -0.02 },
+  nice: { meet: -0.05, "thank you": -0.02 },
+  meet: { you: -0.05 },
+  "thank you": { you: -0.02 },
+  please: { help: -0.03 },
+  i: { love: -0.03, need: -0.02, want: -0.02, understand: -0.02 },
+  love: { you: -0.04, my: -0.02 },
+  good: { morning: -0.02 },
+  sorry: { please: -0.02 },
 };
 
 function handShapeDistance(detected: HandPose, reference: HandPose): number {
@@ -175,6 +176,10 @@ function regionLabel(posY: number): string {
   return "LOW";
 }
 
+function hasCalibration(word: string): boolean {
+  return word in CALIBRATION_OFFSETS;
+}
+
 export class SignMatcher {
   private stableSign: string | null = null;
   private stableCount = 0;
@@ -270,6 +275,19 @@ export class SignMatcher {
     }
 
     candidates.sort((a, b) => a.distance - b.distance);
+
+    const top = candidates[0];
+    if (top && !hasCalibration(top.word)) {
+      const preferred = candidates.find(
+        c => hasCalibration(c.word) && c.distance <= top.distance + RERANK_MARGIN
+      );
+      if (preferred) {
+        const idx = candidates.indexOf(preferred);
+        candidates.splice(idx, 1);
+        candidates.unshift(preferred);
+      }
+    }
+
     this.lastCandidates = candidates.slice(0, 5);
 
     const best = candidates[0];
