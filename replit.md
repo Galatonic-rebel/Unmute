@@ -84,6 +84,14 @@ The project uses a single-repo layout with three top-level directories:
 - Two-tier matching: first filter by position region, then rank by combined distance
 - Recognized words accumulate; user taps "Speak" to polish via DeepSeek and play TTS via OpenAI
 
+### Code Quality & Testing
+- **Unit Tests**: Vitest test suite in `client/src/lib/__tests__/sign-matcher.test.ts` (19 tests covering handShapeDistance, positionDistance, SignMatcher class behavior, calibration offsets, and context priors). Run with `npx vitest run`.
+- **JSDoc**: All core modules (`sign-matcher.ts`, `avatar-model.ts`, `pose-detector.ts`, `server/routes.ts`) have JSDoc comments on key classes, functions, and interfaces.
+- **Error Boundary**: `client/src/components/ErrorBoundary.tsx` wraps SignAvatar and CameraFeed components for graceful failure recovery.
+- **Accessibility**: ARIA labels, roles, live regions, and focus-visible styles on all interactive elements in Home.tsx, CameraFeed.tsx, and SignAvatar.tsx.
+- **Security**: Security headers middleware and per-IP rate limiting (100 req/60s) on API routes in `server/index.ts`. No external packages used.
+- **LICENSE**: MIT license in project root.
+
 ### Dark Theme
 The app uses a premium dark theme by default with CSS custom properties for all color tokens. No light mode toggle exists.
 

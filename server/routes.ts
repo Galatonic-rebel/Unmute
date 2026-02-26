@@ -5,13 +5,29 @@ import { api } from "@shared/routes";
 import { z } from "zod";
 import OpenAI from "openai";
 
+/**
+ * Registers all API route handlers on the Express application.
+ *
+ * Routes:
+ * - GET  /api/deepgram/token     — Returns Deepgram API key for client-side speech recognition
+ * - GET  /api/translations       — Lists all saved translation history entries
+ * - POST /api/translations       — Creates a new translation history entry (validated via Zod)
+ * - POST /api/polish-sentence    — Uses DeepSeek LLM to convert raw ASL word sequence to natural English
+ * - POST /api/tts                — Generates speech audio from text using OpenAI TTS model
+ *
+ * @param httpServer - Node.js HTTP server instance
+ * @param app - Express application instance
+ * @returns The HTTP server (pass-through for chaining)
+ */
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  // Deepgram Token Route
-  // In a real app, we proxy to deepgram or use a secure temporary key mechanism
-  // For the MVP, we use the env variable and give it directly (with a short-lived key if possible)
+  /**
+   * GET /api/deepgram/token
+   * Returns the Deepgram API key for client-side real-time speech-to-text.
+   * In production, this should generate short-lived scoped tokens instead.
+   */
   app.get(api.deepgram.token.path, async (req, res) => {
     try {
       const apiKey = process.env.DEEPGRAM_API_KEY;
@@ -28,6 +44,10 @@ export async function registerRoutes(
     }
   });
 
+  /**
+   * GET /api/translations
+   * Retrieves all translation history entries from storage, ordered by creation time.
+   */
   app.get(api.translations.list.path, async (req, res) => {
     try {
       const allTranslations = await storage.getTranslations();
@@ -38,6 +58,11 @@ export async function registerRoutes(
     }
   });
 
+  /**
+   * POST /api/translations
+   * Creates a new translation record. Request body is validated against
+   * the shared Zod schema before persistence.
+   */
   app.post(api.translations.create.path, async (req, res) => {
     try {
       const input = api.translations.create.input.parse(req.body);
@@ -55,6 +80,12 @@ export async function registerRoutes(
     }
   });
 
+  /**
+   * POST /api/polish-sentence
+   * Accepts an array of raw ASL sign words and uses the DeepSeek LLM to
+   * reconstruct a grammatically correct English sentence, accounting for
+   * ASL-to-English word order differences and missing articles/prepositions.
+   */
   app.post("/api/polish-sentence", async (req, res) => {
     try {
       const schema = z.object({ words: z.array(z.string()).min(1) });
@@ -91,6 +122,12 @@ export async function registerRoutes(
     }
   });
 
+  /**
+   * POST /api/tts
+   * Generates WAV audio from text using OpenAI's audio-capable model.
+   * Supports voice selection (alloy, echo, fable, onyx, nova, shimmer).
+   * Returns raw audio/wav binary response.
+   */
   app.post("/api/tts", async (req, res) => {
     try {
       const schema = z.object({

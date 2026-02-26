@@ -7,12 +7,20 @@ import {
 } from "@mediapipe/tasks-vision";
 import type { HandPose, FaceExpression } from "./asl-poses";
 
+/** Body-relative hand position in normalized coordinates for spatial sign discrimination. */
 export interface HandRelativePos {
+  /** Lateral offset relative to shoulder midpoint (positive = signer's left). */
   posX: number;
+  /** Vertical position mapped to signing regions (0 = hip level, 0.68 = forehead). */
   posY: number;
+  /** Depth relative to shoulders (positive = closer to camera). */
   posZ: number;
 }
 
+/**
+ * Complete per-frame detection output combining hand poses, body landmarks,
+ * spatial hand positions, and facial expression data.
+ */
 export interface DetectionResult {
   left: HandPose | null;
   right: HandPose | null;
@@ -100,6 +108,17 @@ function angleBetween(a: Vec3, b: Vec3): number {
   return Math.acos(d);
 }
 
+/**
+ * Computes finger curl as the sum of inter-joint angles normalized to [0, 1].
+ * 0 = fully extended, 1 = maximally curled.
+ *
+ * @param lm - 21-point hand landmarks from MediaPipe
+ * @param mcp - Metacarpophalangeal joint index
+ * @param pip - Proximal interphalangeal joint index
+ * @param dip - Distal interphalangeal joint index
+ * @param tip - Fingertip landmark index
+ * @returns Curl value in [0, 1]
+ */
 function computeFingerCurl(
   lm: NormalizedLandmark[],
   mcp: number,
@@ -119,6 +138,17 @@ function computeFingerCurl(
   return Math.min(1, Math.max(0, totalAngle / maxAngle));
 }
 
+/**
+ * Computes spread between two adjacent fingers as the angle between
+ * wrist-to-MCP vectors, normalized relative to a rest angle.
+ *
+ * @param lm - 21-point hand landmarks
+ * @param thisMcp - MCP landmark index of the finger being measured
+ * @param adjacentMcp - MCP landmark index of the adjacent reference finger
+ * @param wrist - Wrist landmark index
+ * @param isOutward - If true, negate the result (for index finger spreading outward)
+ * @returns Spread value in [-1, 1]
+ */
 function computeFingerSpread(
   lm: NormalizedLandmark[],
   thisMcp: number,
@@ -161,6 +191,13 @@ function computeThumbAbduction(lm: NormalizedLandmark[]): number {
   return Math.min(1, Math.max(0, (angle - minAngle) / (maxAngle - minAngle)));
 }
 
+/**
+ * Estimates wrist rotation from palm orientation vectors.
+ * Computes palm direction, lateral direction, and palm normal from
+ * wrist/index/pinky/middle MCP landmarks.
+ *
+ * @returns wristX (flexion/extension), wristY (pronation/supination), wristZ (radial/ulnar deviation)
+ */
 function computeWristRotation(lm: NormalizedLandmark[]): {
   wristX: number;
   wristY: number;
@@ -182,6 +219,10 @@ function computeWristRotation(lm: NormalizedLandmark[]): {
   return { wristX, wristY, wristZ };
 }
 
+/**
+ * Converts raw 21-point MediaPipe hand landmarks into a structured HandPose
+ * with curl/spread for each finger, thumb flex/abd, and wrist rotation.
+ */
 function landmarksToHandPose(lm: NormalizedLandmark[]): HandPose {
   const indexCurl = computeFingerCurl(lm, LANDMARK.INDEX_MCP, LANDMARK.INDEX_PIP, LANDMARK.INDEX_DIP, LANDMARK.INDEX_TIP);
   const middleCurl = computeFingerCurl(lm, LANDMARK.MIDDLE_MCP, LANDMARK.MIDDLE_PIP, LANDMARK.MIDDLE_DIP, LANDMARK.MIDDLE_TIP);
@@ -209,6 +250,18 @@ function landmarksToHandPose(lm: NormalizedLandmark[]): HandPose {
   };
 }
 
+/**
+ * Computes hand position relative to the signer's body using pose landmarks.
+ *
+ * Vertical mapping uses anatomical reference points (forehead → eyes → nose →
+ * mouth → chin → shoulders → hips) to produce a continuous posY value that
+ * maps to discrete signing regions. This body-relative normalization makes
+ * detection robust to camera distance and signer height.
+ *
+ * @param handWrist - Hand wrist landmark from HandLandmarker
+ * @param bodyLandmarks - 33-point body pose landmarks from PoseLandmarker
+ * @returns Body-relative position with posX, posY, posZ
+ */
 function computeHandRelativePos(
   handWrist: NormalizedLandmark,
   bodyLandmarks: NormalizedLandmark[],
@@ -281,6 +334,14 @@ function computeHandRelativePos(
   return { posX, posY, posZ };
 }
 
+/**
+ * Extracts a simplified FaceExpression from ARKit-compatible blendshape scores.
+ * Aggregates individual blendshapes (e.g., browInnerUp, browOuterUpLeft/Right)
+ * into composite values (eyebrowRaise) with thresholds to reduce noise.
+ *
+ * @param blendShapes - Array of blendshape categories from FaceLandmarker
+ * @returns Simplified facial expression with 5 semantic parameters
+ */
 function extractFaceExpression(
   blendShapes: Array<{ categoryName: string; score: number }>,
 ): FaceExpression {
@@ -327,12 +388,23 @@ function extractFaceExpression(
 
 const VISION_WASM_URL = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm";
 
+/**
+ * Orchestrates MediaPipe hand, pose, and face landmark detection.
+ *
+ * Initializes three ML models (HandLandmarker, PoseLandmarker, FaceLandmarker)
+ * running on GPU, and provides a single `detect()` method that returns
+ * unified hand poses, body-relative positions, and facial expressions per frame.
+ */
 export class PoseDetector {
   private handLandmarker: HandLandmarker | null = null;
   private poseLandmarker: PoseLandmarker | null = null;
   private faceLandmarker: FaceLandmarker | null = null;
   private lastTimestamp = -1;
 
+  /**
+   * Initializes all three MediaPipe models in parallel.
+   * Downloads WASM runtime and model assets from CDN on first call.
+   */
   async init(_video?: HTMLVideoElement): Promise<void> {
     const vision = await FilesetResolver.forVisionTasks(VISION_WASM_URL);
 
@@ -372,6 +444,17 @@ export class PoseDetector {
     this.faceLandmarker = face;
   }
 
+  /**
+   * Runs all three detectors on the current video frame and combines results.
+   * Hand landmarks are converted to HandPose, body pose is used to compute
+   * body-relative hand positions, and face blendshapes are simplified.
+   *
+   * Note: MediaPipe handedness labels are mirrored (camera perspective),
+   * so "Left" handedness maps to the signer's right hand.
+   *
+   * @param video - HTMLVideoElement with active camera stream
+   * @returns Combined detection result for the frame
+   */
   detect(video: HTMLVideoElement): DetectionResult {
     const empty: DetectionResult = {
       left: null,
@@ -468,6 +551,7 @@ export class PoseDetector {
     };
   }
 
+  /** Closes all MediaPipe model instances and releases GPU resources. */
   destroy(): void {
     if (this.handLandmarker) {
       this.handLandmarker.close();

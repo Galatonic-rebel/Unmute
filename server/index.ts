@@ -22,6 +22,45 @@ app.use(
 
 app.use(express.urlencoded({ extended: false }));
 
+app.use((_req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  next();
+});
+
+const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
+const RATE_LIMIT_WINDOW_MS = 60 * 1000;
+const RATE_LIMIT_MAX = 100;
+
+app.use("/api", (req, res, next) => {
+  const ip = req.ip || req.socket.remoteAddress || "unknown";
+  const now = Date.now();
+  const entry = rateLimitStore.get(ip);
+
+  if (!entry || now > entry.resetTime) {
+    rateLimitStore.set(ip, { count: 1, resetTime: now + RATE_LIMIT_WINDOW_MS });
+    return next();
+  }
+
+  entry.count++;
+  if (entry.count > RATE_LIMIT_MAX) {
+    res.setHeader("Retry-After", String(Math.ceil((entry.resetTime - now) / 1000)));
+    return res.status(429).json({ message: "Too many requests, please try again later." });
+  }
+
+  return next();
+});
+
+setInterval(() => {
+  const now = Date.now();
+  rateLimitStore.forEach((_entry, ip) => {
+    if (now > rateLimitStore.get(ip)!.resetTime) {
+      rateLimitStore.delete(ip);
+    }
+  });
+}, 5 * 60 * 1000);
+
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",

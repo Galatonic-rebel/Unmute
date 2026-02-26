@@ -2,18 +2,27 @@ import type { HandPose, FaceExpression } from "./asl-poses";
 import { FINGERSPELLING, WORD_SIGNS } from "./asl-poses";
 import type { HandRelativePos } from "./pose-detector";
 
+/** Result of a successful sign recognition, containing the matched word and confidence score. */
 export interface MatchResult {
   word: string;
   confidence: number;
 }
 
+/** Intermediate candidate during sign matching, storing distance metrics for ranking. */
 export interface MatchCandidate {
   word: string;
+  /** Combined weighted distance (lower = better match). */
   distance: number;
+  /** Hand shape distance component only. */
   shapeDist: number;
+  /** Hand position distance component only. */
   posDist: number;
 }
 
+/**
+ * Complete input for a single frame of sign detection.
+ * Includes hand poses, spatial positions relative to body, and facial expression.
+ */
 export interface FullMatchInput {
   right: HandPose | null;
   left: HandPose | null;
@@ -22,13 +31,24 @@ export interface FullMatchInput {
   detectedFace: FaceExpression | null;
 }
 
+/** Maximum distance threshold; candidates above this are rejected. */
 const CONFIDENCE_THRESHOLD = 0.42;
+/** Number of consecutive frames a sign must be the top candidate before recognition fires. */
 const STABILITY_FRAMES = 10;
+/** Cooldown frames after a recognition event to prevent immediate re-triggering. */
 const COOLDOWN_FRAMES = 8;
+/** Distance ratio below which high-confidence fast-path triggers (fewer stability frames). */
 const HIGH_CONFIDENCE_RATIO = 0.50;
+/** Reduced stability frame requirement for high-confidence matches. */
 const HIGH_CONFIDENCE_STABILITY = 4;
+/** Margin within which a calibrated sign can overtake an uncalibrated top candidate. */
 const RERANK_MARGIN = 0.08;
 
+/**
+ * Per-sign distance offsets that bias matching toward commonly-used signs.
+ * Negative values reduce distance, making the sign easier to recognize.
+ * Tuned empirically during user testing sessions.
+ */
 const CALIBRATION_OFFSETS: Record<string, number> = {
   hello: -0.10,
   my: -0.10,
@@ -53,6 +73,11 @@ const CALIBRATION_OFFSETS: Record<string, number> = {
   home: -0.04,
 };
 
+/**
+ * Contextual prior map: after recognizing a sign (key), subsequent signs (inner keys)
+ * receive a distance bonus (negative = easier to match), modelling ASL phrase patterns.
+ * Example: after "hello", "my" gets a -0.04 boost since "hello my name" is common.
+ */
 const CONTEXT_PRIOR: Record<string, Record<string, number>> = {
   hello: { my: -0.04, nice: -0.03, you: -0.02 },
   my: { name: -0.05, friend: -0.02, family: -0.02, home: -0.02 },
@@ -67,7 +92,18 @@ const CONTEXT_PRIOR: Record<string, Record<string, number>> = {
   sorry: { please: -0.02 },
 };
 
-function handShapeDistance(detected: HandPose, reference: HandPose): number {
+/**
+ * Computes weighted Euclidean distance between two hand poses based on finger curl,
+ * spread, thumb flex/abduction, and optional wrist rotation.
+ *
+ * Weights: finger curl (1.0), spread (0.3), thumb flex (0.9), thumb abd (0.6), wrist (0.2).
+ * Returns normalized RMS distance in [0, ~1+] range.
+ *
+ * @param detected - Hand pose extracted from camera via MediaPipe
+ * @param reference - Reference hand pose from the ASL dictionary
+ * @returns Weighted RMS distance (0 = identical poses)
+ */
+export function handShapeDistance(detected: HandPose, reference: HandPose): number {
   let totalWeight = 0;
   let totalDist = 0;
 
@@ -107,7 +143,18 @@ function handShapeDistance(detected: HandPose, reference: HandPose): number {
   return totalWeight > 0 ? Math.sqrt(totalDist / totalWeight) : 1;
 }
 
-function positionDistance(
+/**
+ * Computes spatial distance between detected hand position and reference sign position.
+ * Uses body-relative coordinates (posY = vertical region, posX = lateral, posZ = depth).
+ *
+ * Weights: vertical (3.0) >> lateral (1.0) > depth (0.5), reflecting that
+ * vertical position carries the most semantic information in ASL.
+ *
+ * @param detected - Body-relative hand position from PoseDetector, or null if unavailable
+ * @param reference - Reference pose containing expected position fields
+ * @returns Weighted RMS position distance, or 0 if position data is unavailable
+ */
+export function positionDistance(
   detected: HandRelativePos | null,
   reference: HandPose,
 ): number {
@@ -138,6 +185,14 @@ function positionDistance(
   return count > 0 ? Math.sqrt(sumSq / count) : 0;
 }
 
+/**
+ * Computes distance between detected and reference facial expressions.
+ * Considers eyebrow raise, mouth open/smile, cheek puff (weight 0.5), and eye squint (weight 0.5).
+ *
+ * @param detected - Facial expression from FaceLandmarker blendshapes
+ * @param reference - Expected facial expression for the sign, or undefined if face is irrelevant
+ * @returns RMS face expression distance, or 0 if either input is null/undefined
+ */
 function faceDistance(
   detected: FaceExpression | null,
   reference: FaceExpression | undefined,
@@ -160,6 +215,11 @@ function faceDistance(
   return Math.sqrt(sumSq / 4);
 }
 
+/**
+ * Maps vertical hand position to a discrete signing region index (0-4).
+ * Regions: 0=LOW (<0.05), 1=CHEST, 2=CHIN, 3=FACE, 4=FOREHEAD (>0.55).
+ * Used for coarse region filtering to skip unlikely candidates.
+ */
 function getRegionIndex(posY: number): number {
   if (posY > 0.55) return 4;
   if (posY > 0.42) return 3;
@@ -180,6 +240,18 @@ function hasCalibration(word: string): boolean {
   return word in CALIBRATION_OFFSETS;
 }
 
+/**
+ * Stateful ASL sign matcher that processes per-frame hand/body/face data
+ * and emits recognized signs with temporal stability filtering.
+ *
+ * Algorithm overview:
+ * 1. For each frame, compute distance to all known signs (fingerspelling + word signs)
+ * 2. Apply calibration offsets and contextual priors to distances
+ * 3. Re-rank: prefer calibrated signs within RERANK_MARGIN of the top candidate
+ * 4. Require STABILITY_FRAMES consecutive frames as top candidate before firing
+ *    (HIGH_CONFIDENCE_STABILITY for very confident matches)
+ * 5. Enforce COOLDOWN_FRAMES between recognitions to avoid duplicates
+ */
 export class SignMatcher {
   private stableSign: string | null = null;
   private stableCount = 0;
@@ -190,6 +262,13 @@ export class SignMatcher {
   public lastRegion: string = "";
   public lastPosY: number = 0;
 
+  /**
+   * Process a single frame of detection data and return a recognized sign if
+   * the stability and confidence criteria are met.
+   *
+   * @param input - Complete frame data including hand poses, positions, and face
+   * @returns MatchResult with word and confidence if a sign is recognized, null otherwise
+   */
   match(input: FullMatchInput): MatchResult | null {
     if (this.cooldownCounter > 0) {
       this.cooldownCounter--;
@@ -323,6 +402,11 @@ export class SignMatcher {
     return null;
   }
 
+  /**
+   * Retrieves the contextual distance boost for a candidate sign based on the
+   * most recently recognized sign. Returns a negative value (distance reduction)
+   * if the candidate is a likely successor in common ASL phrases.
+   */
   private getContextBoost(candidate: string): number {
     if (!this.recentContext) return 0;
     const priors = CONTEXT_PRIOR[this.recentContext];
@@ -330,6 +414,7 @@ export class SignMatcher {
     return priors[candidate] ?? 0;
   }
 
+  /** Resets all internal state (stability counters, context, candidates). */
   reset(): void {
     this.stableSign = null;
     this.stableCount = 0;

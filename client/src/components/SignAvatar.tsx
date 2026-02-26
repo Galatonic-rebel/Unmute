@@ -338,6 +338,8 @@ export function SignAvatar({ currentWord, isRecording, signQueue, finalResult, i
         className="relative w-full rounded-2xl overflow-hidden border border-white/10 flex items-center justify-center bg-black/30 backdrop-blur-xl"
         style={{ aspectRatio: '16/10' }}
         data-testid="sign-avatar-container"
+        role="region"
+        aria-label="3D avatar unavailable — displaying text fallback"
       >
         <div className="text-center px-8">
           <p className="text-white/40 text-sm mb-2">3D avatar unavailable</p>
@@ -355,11 +357,20 @@ export function SignAvatar({ currentWord, isRecording, signQueue, finalResult, i
       className="relative w-full rounded-2xl overflow-hidden border border-white/10 bg-black/25 backdrop-blur-sm"
       style={{ aspectRatio: '16/10' }}
       data-testid="sign-avatar-container"
+      role="region"
+      aria-label={
+        loading
+          ? 'Loading 3D ASL avatar'
+          : isRecording
+            ? `3D avatar signing ASL — currently signing: ${currentWord || 'waiting for speech'}`
+            : '3D ASL avatar ready'
+      }
     >
       <canvas
         ref={canvasRef}
         className="w-full h-full block"
         data-testid="sign-avatar-canvas"
+        aria-hidden="true"
       />
 
       {loading && (
@@ -382,7 +393,7 @@ export function SignAvatar({ currentWord, isRecording, signQueue, finalResult, i
         )}
       </div>
 
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-[90%] max-w-2xl pointer-events-none" data-testid="subtitle-area">
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-[90%] max-w-2xl pointer-events-none" data-testid="subtitle-area" aria-live="polite" aria-atomic="true" role="status">
         {(finalResult || interimResult) ? (
           <div
             className="px-5 py-2.5 rounded-lg text-center"

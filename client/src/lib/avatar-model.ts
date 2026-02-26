@@ -3,6 +3,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import type { HandPose, FaceExpression } from './asl-poses';
 
+/** Maps pose finger names to bone naming convention used in the avatar skeleton. */
 const FINGER_MAP: Record<string, string> = {
   index: 'Index',
   middle: 'Middle',
@@ -10,12 +11,18 @@ const FINGER_MAP: Record<string, string> = {
   pinky: 'Pinky',
 };
 
+/** Maximum finger curl angle in radians (~162 degrees). */
 const CURL_MAX = Math.PI * 0.90;
+/** Per-joint distribution of curl angle across proximal, intermediate, distal joints. */
 const CURL_WEIGHTS = [0.36, 0.40, 0.24];
+/** Maximum thumb flexion angle in radians (~58 degrees). */
 const THUMB_FLEX_MAX = Math.PI * 0.32;
+/** Maximum thumb abduction angle in radians (~40 degrees). */
 const THUMB_ABD_MAX = Math.PI * 0.22;
+/** Per-joint distribution of thumb flex across CMC, MCP, IP joints. */
 const THUMB_FLEX_WEIGHTS = [0.38, 0.40, 0.22];
 
+/** Cached bone chain and segment lengths for analytic two-bone IK solving. */
 interface ArmChain {
   shoulder: THREE.Bone;
   arm: THREE.Bone;
@@ -25,10 +32,24 @@ interface ArmChain {
   lowerLen: number;
 }
 
+/** Model-space Y coordinate of the signing neutral position (roughly chest height). */
 const SIGN_REST_MODEL_Y = 1.15;
+/** Model-space Z offset placing hands in front of the body. */
 const SIGN_BASE_Z = 0.22;
+/** Model-space lateral X offset for left/right hand separation. */
 const SIGN_SIDE_X = 0.17;
 
+/**
+ * Controls a Ready Player Me GLB avatar for ASL sign language rendering.
+ *
+ * Responsibilities:
+ * - Load and parse GLB model, caching bone references and morph targets
+ * - Apply finger/thumb poses via joint rotation
+ * - Position hands using analytic two-bone IK solver
+ * - Drive facial expressions through morph target blendshapes
+ * - Apply idle breathing/sway animation
+ * - Load and play FBX sign language animation clips with crossfade transitions
+ */
 export class AvatarController {
   public root: THREE.Group;
   private bones = new Map<string, THREE.Bone>();
@@ -62,6 +83,11 @@ export class AvatarController {
 
   get isLoaded() { return this._loaded; }
 
+  /**
+   * Loads a GLB avatar model, initializes bone/morph caches, computes arm chain
+   * lengths for IK, sets up the animation mixer, and applies the idle pose.
+   * @param url - URL to the .glb avatar file
+   */
   async load(url: string): Promise<void> {
     const loader = new GLTFLoader();
     const gltf = await loader.loadAsync(url);
@@ -196,6 +222,22 @@ export class AvatarController {
     }
   }
 
+  /**
+   * Analytic two-bone IK solver for arm positioning.
+   *
+   * Algorithm:
+   * 1. Reset arm to rest pose to get stable shoulder/elbow world positions
+   * 2. Clamp target distance to reachable range [|L1-L2|, L1+L2]
+   * 3. Solve shoulder angle using law of cosines
+   * 4. Compute elbow bend plane using a pole target (offset laterally and behind)
+   * 5. Derive desired arm rotation via unit vector alignment
+   * 6. Derive forearm rotation to point hand at target
+   * 7. Slerp from saved pose to IK solution by blend factor t
+   *
+   * @param side - Which arm to solve ('left' | 'right')
+   * @param targetModelPos - Target hand position in model space
+   * @param t - Blend factor [0,1] for smooth interpolation
+   */
   private _solveArmIK(side: 'left' | 'right', targetModelPos: THREE.Vector3, t: number) {
     const chain = this.armChains[side];
     if (!chain) return;
@@ -284,6 +326,14 @@ export class AvatarController {
     chain.forearm.quaternion.copy(savedForearmQ).slerp(forearmDesiredLocalQ, t);
   }
 
+  /**
+   * Applies an ASL hand pose to the avatar's finger and wrist bones.
+   * Distributes curl/flex angles across joint chains using weighted proportions.
+   *
+   * @param side - 'left' or 'right' hand
+   * @param pose - Target hand pose with finger curl, spread, thumb, and wrist values
+   * @param t - Blend factor [0,1] for slerp interpolation from current to target
+   */
   applyHandPose(side: 'left' | 'right', pose: HandPose, t: number) {
     if (!this._loaded) return;
     const prefix = side === 'left' ? 'Left' : 'Right';
@@ -338,6 +388,15 @@ export class AvatarController {
     }
   }
 
+  /**
+   * Positions a hand using IK by converting ASL-space coordinates to model space.
+   *
+   * @param side - 'left' or 'right' hand
+   * @param posX - Lateral offset from neutral signing position
+   * @param posY - Vertical offset from neutral signing position
+   * @param posZ - Depth offset from neutral signing position
+   * @param t - Blend factor for IK interpolation
+   */
   setHandTarget(side: 'left' | 'right', posX: number, posY: number, posZ: number, t: number) {
     if (!this._loaded) return;
 
@@ -356,6 +415,14 @@ export class AvatarController {
     this._applyIdlePose(t);
   }
 
+  /**
+   * Applies facial expression to the avatar using morph target blendshapes.
+   * Maps ASL expression parameters (eyebrow raise, mouth open/smile, cheek puff,
+   * eye squint) to ARKit-compatible blendshape names. Includes subtle head tilt.
+   *
+   * @param expr - Target facial expression
+   * @param t - Blend factor for smooth interpolation
+   */
   applyExpression(expr: FaceExpression, t: number) {
     if (this.morphMeshes.length === 0) return;
 
@@ -422,6 +489,12 @@ export class AvatarController {
     }
   }
 
+  /**
+   * Applies idle breathing and micro-sway animation using layered sinusoidal functions.
+   * Affects spine bones, head, and arms to create natural idle movement.
+   *
+   * @param time - Current timestamp in milliseconds (e.g. from requestAnimationFrame)
+   */
   applySway(time: number) {
     if (!this._loaded) return;
     const ts = time * 0.0006;
@@ -532,6 +605,13 @@ export class AvatarController {
 
   private static readonly CROSSFADE_DUR = 0.6;
 
+  /**
+   * Loads an FBX animation clip and plays it with crossfade transition.
+   * Clips are cached after first load. Only signing-related bone tracks are retained.
+   * Returns a Promise that resolves when the animation finishes or times out.
+   *
+   * @param url - URL to the .fbx animation file
+   */
   async loadAndPlayAnimation(url: string): Promise<void> {
     if (!this.mixer) return;
 
@@ -609,6 +689,7 @@ export class AvatarController {
     return this._animationPlaying;
   }
 
+  /** Stops all animations, releases geometry and materials. Call on unmount. */
   dispose() {
     this.stopAnimation();
     if (this.mixer) {

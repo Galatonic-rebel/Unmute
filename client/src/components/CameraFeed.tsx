@@ -164,6 +164,8 @@ export function CameraFeed({
       className="relative w-full rounded-2xl overflow-hidden border border-white/10 bg-black/25 backdrop-blur-sm"
       style={{ aspectRatio: '16/10' }}
       data-testid="camera-feed-container"
+      role="region"
+      aria-label="ASL sign language camera feed with real-time detection"
     >
       <video
         ref={videoRef}
@@ -173,12 +175,14 @@ export function CameraFeed({
         className="w-full h-full object-cover block"
         style={{ transform: 'scaleX(-1)' }}
         data-testid="camera-feed-video"
+        aria-label="Live camera feed for ASL sign detection"
       />
 
       <canvas
         ref={canvasRef}
         className="absolute inset-0 w-full h-full pointer-events-none"
         data-testid="camera-feed-canvas"
+        aria-hidden="true"
       />
 
       <div className="absolute top-3 left-3 flex items-center gap-2">
@@ -197,6 +201,8 @@ export function CameraFeed({
             onClick={() => setShowDebug((v) => !v)}
             className={`w-6 h-6 ${showDebug ? 'text-yellow-400' : 'text-white/30'}`}
             data-testid="button-debug-toggle"
+            aria-label={showDebug ? 'Hide debug information' : 'Show debug information'}
+            aria-pressed={showDebug}
           >
             <Bug className="w-3.5 h-3.5" />
           </Button>
@@ -237,8 +243,8 @@ export function CameraFeed({
             style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }}
             data-testid="current-sign-badge"
           >
-            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse shadow-[0_0_6px_rgba(34,197,94,0.8)]" />
-            <span className="text-sm font-semibold text-white">{currentSign}</span>
+            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse shadow-[0_0_6px_rgba(34,197,94,0.8)]" aria-hidden="true" />
+            <span className="text-sm font-semibold text-white" aria-live="assertive" aria-atomic="true">{currentSign}</span>
           </motion.div>
         )}
       </AnimatePresence>
@@ -253,6 +259,7 @@ export function CameraFeed({
               disabled={isSpeaking}
               className="text-white/70"
               data-testid="button-speak"
+              aria-label={isSpeaking ? 'Speaking recognized signs aloud' : 'Speak recognized signs aloud'}
             >
               <Volume2 />
             </Button>
@@ -262,6 +269,7 @@ export function CameraFeed({
               onClick={onReset}
               className="text-white/70"
               data-testid="button-clear"
+              aria-label="Clear all recognized signs"
             >
               <Trash2 />
             </Button>
@@ -269,7 +277,7 @@ export function CameraFeed({
         )}
       </div>
 
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-[90%] max-w-2xl pointer-events-none" data-testid="subtitle-area">
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-[90%] max-w-2xl pointer-events-none" data-testid="subtitle-area" aria-live="polite" aria-atomic="true" role="status">
         {recognizedWords.length > 0 ? (
           <div className="space-y-2">
             <div
