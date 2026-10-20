@@ -68,29 +68,30 @@ const UTTERANCE_PAUSE_MS = 3500;
 
 /**
  * Local rule-based reply engine (no API, no LLM). Maps recognized sign
- * utterances to short replies that the avatar signs back. Replies are kept
- * short so fingerspelling fallback stays brief.
+ * utterances to short replies that the avatar signs back. Replies are
+ * deliberately composed of words that exist in the pose dictionary (or
+ * its synonym aliases) so the reply is signed, not fingerspelled.
  */
 const COMBO_REPLIES: Array<{ all: string[]; reply: string }> = [
-  { all: ['want', 'water'], reply: 'sure bringing water now' },
-  { all: ['want', 'eat'], reply: 'yes food is coming' },
-  { all: ['hello', 'thank you'], reply: 'hello you are welcome' },
+  { all: ['want', 'water'], reply: 'sure bring water now' },
+  { all: ['want', 'eat'], reply: 'yes i bring food' },
+  { all: ['hello', 'thank you'], reply: 'hello you welcome' },
 ];
 
 /** Multiple variants per intent + rotation so replies don't feel canned. */
 const SINGLE_REPLIES: Record<string, string[]> = {
-  hello: ['hello nice to meet you', 'hi there good to see you'],
-  'thank you': ['you are welcome', 'no need to thank me'],
-  thanks: ['you are welcome', 'any time'],
-  yes: ['great will do that', 'ok good'],
-  no: ['okay understood no problem', 'alright noted'],
-  please: ['sure happy to help', 'of course'],
-  sorry: ['no worries at all', 'its completely fine'],
-  help: ['i am here what do you need', 'tell me how to help'],
-  water: ['i will get you water', 'one water coming up'],
-  eat: ['good i will bring food', 'want me to bring something'],
-  drink: ['here is a drink for you', 'i will bring one'],
-  want: ['tell me what you want', 'happy to get it for you'],
+  hello: ['hello nice meet you', 'hello good see you'],
+  'thank you': ['you welcome', 'any time'],
+  thanks: ['you welcome', 'any time'],
+  yes: ['yes okay good', 'yes i do'],
+  no: ['no okay fine', 'no you no need'],
+  please: ['sure happy help you', 'you want i get'],
+  sorry: ['no okay fine', 'you fine i happy'],
+  help: ['i here what you need', 'tell me how i help'],
+  water: ['i will get you water', 'one water soon'],
+  eat: ['good i bring food', 'you hungry i get food'],
+  drink: ['here drink you', 'i will get drink'],
+  want: ['tell me what you want', 'i get what you want'],
 };
 
 /** Maps a recognized sign utterance to a reply string (empty → fallback). */
@@ -109,7 +110,7 @@ function generateReply(utteranceWords: string[]): string {
       return reply;
     }
   }
-  return `i understood ${utteranceWords.join(' ')}`;
+  return `i see ${utteranceWords.join(' ')}`;
 }
 
 type CameraStatus = 'off' | 'starting' | 'on' | 'denied' | 'no-camera' | 'error';
@@ -255,6 +256,14 @@ export default function Studio() {
     return { kind: 'idle' as const, text: 'No supported sign detected' };
   }, [debugInfo, isDetecting]);
 
+  /** Most recent completed signed utterance (for the caption below the camera). */
+  const lastSignedText = useMemo(() => {
+    for (let i = chat.length - 1; i >= 0; i--) {
+      if (chat[i].role === 'signed') return chat[i].text;
+    }
+    return '';
+  }, [chat]);
+
   // ── RIGHT: text → sign ─────────────────────────────────────
   const [message, setMessage] = useState('');
   const [sentMessage, setSentMessage] = useState('');
@@ -263,6 +272,10 @@ export default function Studio() {
   const [ttsEnabled, setTtsEnabled] = useState(true);
   /** Avatar playback pace: >1 slower (more readable), <1 faster. */
   const [pace, setPace] = useState(1.3);
+  /** Word-by-word caption state for the "captions below both" UI. */
+  const [captionWords, setCaptionWords] = useState<string[]>([]);
+  const [captionIdx, setCaptionIdx] = useState(0);
+  const [signOrigin, setSignOrigin] = useState<'reply' | 'typed'>('typed');
 
   const ttsSupported = typeof window !== 'undefined' && 'speechSynthesis' in window;
 
@@ -277,9 +290,12 @@ export default function Studio() {
   }, []);
 
   /** Displays text as a caption and queues it for the avatar (+ optional voice). */
-  const signText = useCallback((text: string) => {
+  const signText = useCallback((text: string, origin: 'reply' | 'typed' = 'typed') => {
     const words = text.toLowerCase().replace(/[^a-z'\s-]/gi, ' ').split(/\s+/).filter(Boolean);
     setSentMessage(text);
+    setCaptionWords(words);
+    setCaptionIdx(0);
+    setSignOrigin(origin);
     setNowSigning(null);
     setSignQueue(words);   // fresh array reference every call → re-plays even identical text
     if (ttsEnabled && ttsSupported) {
@@ -308,7 +324,7 @@ export default function Studio() {
     if (autoReplyRef.current) {
       const reply = generateReply(words);
       addTurn('reply', reply);
-      signText(reply);
+      signText(reply, 'reply');
     }
   }, [addTurn, signText]);
   flushRef.current = flushUtterance;
@@ -332,6 +348,7 @@ export default function Studio() {
 
   const handleAvatarWord = useCallback((word: string, mode: string | null) => {
     setNowSigning({ word, mode: mode ?? 'unknown' });
+    setCaptionIdx((i) => i + 1);
   }, []);
 
   const handleAvatarIdle = useCallback(() => {
@@ -464,7 +481,7 @@ export default function Studio() {
           <div className="flex items-center gap-2 shrink-0">
             <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full border border-white/15 bg-white/5 text-slate-300">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              ASL · {SUPPORTED_SIGNS.length} signs
+              ASL → ASL · {SUPPORTED_SIGNS.length} signs
             </span>
           </div>
         </div>
@@ -481,9 +498,9 @@ export default function Studio() {
                   <span className="w-7 h-7 rounded-lg bg-emerald-500/15 border border-emerald-400/20 grid place-items-center">
                     <Camera className="w-3.5 h-3.5 text-emerald-300" />
                   </span>
-                  Sign&thinsp;→&thinsp;Text
+                  Sign → Avatar reply
                 </h2>
-                <p className="text-[11px] text-slate-400 mt-0.5">Sign one of the supported signs to the camera</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">Sign to the camera — live captions below, ASL reply below</p>
               </div>
               <span
                 className={`text-[11px] px-2.5 py-1 rounded-full border shrink-0 ${
@@ -544,6 +561,40 @@ export default function Studio() {
                   </span>
                 </div>
               )}
+            </div>
+
+            {/* Live caption — below camera ("captions below both") */}
+            <div
+              className={`mx-4 mt-3 rounded-xl border px-4 py-3 transition-colors min-h-[64px] ${
+                utteranceBuffer.length > 0
+                  ? 'border-emerald-500/40 bg-emerald-500/10'
+                  : 'border-white/10 bg-white/5'
+              }`}
+            >
+              <p className="text-[11px] font-semibold uppercase tracking-wider mb-1">
+                {utteranceBuffer.length > 0 ? (
+                  <span className="flex items-center gap-1.5 text-emerald-300">
+                    <CircleDashed className="w-3 h-3 animate-spin" /> You are signing…
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1.5 text-slate-500">
+                    <Hand className="w-3 h-3" /> Your signs
+                  </span>
+                )}
+              </p>
+              <p
+                className={`text-lg font-semibold leading-snug break-words ${
+                  utteranceBuffer.length > 0
+                    ? 'text-emerald-200'
+                    : lastSignedText
+                      ? 'text-slate-100'
+                      : 'text-slate-500'
+                }`}
+              >
+                {utteranceBuffer.length > 0
+                  ? `${utteranceBuffer.join(' ')} …`
+                  : lastSignedText || 'captions of your signs appear here'}
+              </p>
             </div>
 
             {/* Error banner */}
@@ -694,9 +745,9 @@ export default function Studio() {
                   <span className="w-7 h-7 rounded-lg bg-indigo-500/15 border border-indigo-400/20 grid place-items-center">
                     <Type className="w-3.5 h-3.5 text-indigo-300" />
                   </span>
-                  Text&thinsp;→&thinsp;Sign
+                  Type → Avatar signs
                 </h2>
-                <p className="text-[11px] text-slate-400 mt-0.5">Type a message — the avatar signs it back</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">For non-ASL users: type any message — the avatar signs it back</p>
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <Button
@@ -827,30 +878,42 @@ export default function Studio() {
               </div>
             </div>
 
-            {/* Caption under avatar */}
-            <div className="mx-4 mt-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3 min-h-[76px]">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                    {sentMessage ? 'Message being signed' : 'No message yet'}
-                  </p>
-                  <p className={`text-sm truncate ${sentMessage ? 'text-slate-100' : 'text-slate-500'}`}>
-                    {sentMessage || 'Type a message and press Send…'}
-                  </p>
-                </div>
-                <div className="shrink-0 text-right">
-                  {nowSigning ? (
-                    <>
-                      <p className="text-xs font-semibold text-indigo-300">“{nowSigning.word}”</p>
-                      {MODE_TAG[nowSigning.mode] && (
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded border ${MODE_TAG[nowSigning.mode].className}`}>
-                          {MODE_TAG[nowSigning.mode].label}
-                        </span>
-                      )}
-                    </>
-                  ) : null}
-                </div>
+            {/* Caption under avatar — live, highlights the word being signed */}
+            <div
+              className={`mx-4 mt-3 rounded-xl border px-4 py-3 min-h-[76px] transition-colors ${
+                nowSigning ? 'border-indigo-500/40 bg-indigo-500/[0.08]' : 'border-white/10 bg-white/5'
+              }`}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                  {sentMessage
+                    ? signOrigin === 'reply'
+                      ? 'Avatar replies — in ASL'
+                      : 'Message being signed'
+                    : 'No message yet'}
+                </p>
+                {nowSigning && MODE_TAG[nowSigning.mode] && (
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded border ${MODE_TAG[nowSigning.mode].className}`}>
+                    {MODE_TAG[nowSigning.mode].label}
+                  </span>
+                )}
               </div>
+              <p className={`text-base font-semibold leading-snug break-words min-h-[24px] ${sentMessage ? 'text-slate-100' : 'text-slate-500'}`}>
+                {captionWords.length > 0
+                  ? captionWords.map((w, i) => (
+                      <span
+                        key={`${w}-${i}`}
+                        className={
+                          nowSigning && i === captionIdx - 1
+                            ? 'text-emerald-300 underline decoration-2 underline-offset-4'
+                            : ''
+                        }
+                      >
+                        {w}{' '}
+                      </span>
+                    ))
+                  : (sentMessage || 'Type a message and press Send…')}
+              </p>
             </div>
 
             {/* Input */}

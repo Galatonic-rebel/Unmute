@@ -235,14 +235,15 @@ st.divider()
 with st.expander("How it works", expanded=True):
     st.markdown(
         """
-**Left panel — Sign → Text**  \n3 MediaPipe models (hands, body, face) run in your browser at
+**Left panel — Sign → Avatar reply (asl-asl)**  \n3 MediaPipe models (hands, body, face) run in your browser at
 ~15 fps. Recognized hand poses are matched against the curated vocabulary, buffered into
-utterances (a ~3.5 s pause ends an utterance), shown as captions, and — when auto-reply is on —
-answered by a local rule-based reply engine.
+utterances (a ~3.5 s pause ends an utterance), shown as captions below the camera, and — when
+auto-reply is on — answered by a local rule-based reply engine that the 3D avatar signs back in ASL.
 
-**Right panel — Text → Sign**  \nYour typed message is mapped onto the 3D Ready Player Me
-avatar: real FBX mocap clips where available, procedural pose-signs from a ~610-entry
-dictionary otherwise, fingerspelling for everything else. Optional browser voice playback.
+**Right panel — Type → Avatar signs (non-ASL input)**  \nNon-ASL users can type any message
+(or use quick replies): words with signs are performed by the 3D Ready Player Me avatar — real FBX
+mocap clips where available, procedural poses from a ~610-entry dictionary otherwise, fingerspelling
+for everything else. Optional browser voice playback.
 
 The conversation view shows signed utterances, typed messages, and replies in order.
         """
