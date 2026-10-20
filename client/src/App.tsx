@@ -7,7 +7,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import NotFound from "@/pages/not-found";
 import Studio from "@/pages/Studio";
 
-function Router() {
+function AppRoutes() {
   // Serve under the Vite build base (e.g. /Unmute on GitHub Pages, / locally).
   return (
     <Router base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
