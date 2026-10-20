@@ -150,7 +150,9 @@ export function SignAvatar({ currentWord, isRecording, signQueue, finalResult, i
         scene.add(face);
 
         avatar = new AvatarController();
-        await avatar.load('/avatar.glb');
+        // import.meta.env.BASE_URL is Vite's build-time base ("/" locally,
+        // "/Unmute/" on GitHub Pages) so hosting under a sub-path resolves assets correctly.
+        await avatar.load(`${import.meta.env.BASE_URL}avatar.glb`);
 
         if (cancelled) {
           avatar.dispose();
