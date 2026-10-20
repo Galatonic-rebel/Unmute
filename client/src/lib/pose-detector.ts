@@ -222,6 +222,60 @@ function computeWristRotation(lm: NormalizedLandmark[]): {
 }
 
 /**
+ * Additive: exponential moving average between the previous frame's extracted
+ * hand pose and the current one. Numeric fields only; undefined wrist fields
+ * pass through. alpha = 1 → no smoothing.
+ */
+function smoothHandPose(prev: HandPose | null, cur: HandPose, alpha: number): HandPose {
+  if (!prev || alpha >= 1) return cur;
+  const mix = (a: number, b: number) => a + (b - a) * alpha;
+  const mixOpt = (a: number | undefined, b: number | undefined) =>
+    a !== undefined && b !== undefined ? mix(a, b) : b;
+  return {
+    thumb: { flex: mix(prev.thumb.flex, cur.thumb.flex), abd: mix(prev.thumb.abd, cur.thumb.abd) },
+    index: { curl: mix(prev.index.curl, cur.index.curl), spread: mix(prev.index.spread, cur.index.spread) },
+    middle: { curl: mix(prev.middle.curl, cur.middle.curl), spread: mix(prev.middle.spread, cur.middle.spread) },
+    ring: { curl: mix(prev.ring.curl, cur.ring.curl), spread: mix(prev.ring.spread, cur.ring.spread) },
+    pinky: { curl: mix(prev.pinky.curl, cur.pinky.curl), spread: mix(prev.pinky.spread, cur.pinky.spread) },
+    wristX: mixOpt(prev.wristX, cur.wristX),
+    wristY: mixOpt(prev.wristY, cur.wristY),
+    wristZ: mixOpt(prev.wristZ, cur.wristZ),
+  };
+}
+
+/** Additive: EMA for body-relative hand position (posX/posY/posZ). */
+function smoothHandRelativePos(
+  prev: HandRelativePos | null,
+  cur: HandRelativePos,
+  alpha: number,
+): HandRelativePos {
+  if (!prev || alpha >= 1) return cur;
+  const mix = (a: number, b: number) => a + (b - a) * alpha;
+  return { posX: mix(prev.posX, cur.posX), posY: mix(prev.posY, cur.posY), posZ: mix(prev.posZ, cur.posZ) };
+}
+
+/** Additive: EMA for facial expression values (optional fields pass through). */
+function smoothFaceExpression(
+  prev: FaceExpression | null,
+  cur: FaceExpression,
+  alpha: number,
+): FaceExpression {
+  if (!prev || alpha >= 1) return cur;
+  const mix = (a: number, b: number) => a + (b - a) * alpha;
+  const mixOpt = (a: number | undefined, b: number | undefined) =>
+    a !== undefined && b !== undefined ? mix(a, b) : b;
+  return {
+    eyebrowRaise: mix(prev.eyebrowRaise, cur.eyebrowRaise),
+    mouthOpen: mix(prev.mouthOpen, cur.mouthOpen),
+    mouthSmile: mix(prev.mouthSmile, cur.mouthSmile),
+    headTiltX: mixOpt(prev.headTiltX, cur.headTiltX),
+    headTiltY: mixOpt(prev.headTiltY, cur.headTiltY),
+    cheekPuff: mixOpt(prev.cheekPuff, cur.cheekPuff),
+    eyeSquint: mixOpt(prev.eyeSquint, cur.eyeSquint),
+  };
+}
+
+/**
  * Converts raw 21-point MediaPipe hand landmarks into a structured HandPose
  * with curl/spread for each finger, thumb flex/abd, and wrist rotation.
  */
@@ -404,6 +458,20 @@ export class PoseDetector {
   private lastTimestamp = -1;
 
   /**
+   * Additive: temporal smoothing (exponential moving average) of extracted
+   * features. Raw per-frame estimates of finger curl/spread and wrist rotation
+   * are noisy, which makes the matcher's ranking flicker between similar signs.
+   * An EMA at ~15 fps with alpha 0.45 keeps ~130 ms of responsiveness while
+   * removing most single-frame jitter. Set smoothingAlpha = 1 to disable.
+   */
+  public smoothingAlpha = 0.45;
+  private smoothRight: HandPose | null = null;
+  private smoothLeft: HandPose | null = null;
+  private smoothRightPos: HandRelativePos | null = null;
+  private smoothLeftPos: HandRelativePos | null = null;
+  private smoothFace: FaceExpression | null = null;
+
+  /**
    * Initializes all three MediaPipe models in parallel.
    * Downloads WASM runtime and model assets from CDN on first call.
    */
@@ -509,13 +577,19 @@ export class PoseDetector {
         const pose = landmarksToHandPose(lm);
 
         if (handedness === "Left") {
-          rightPose = pose;
+          this.smoothRight = smoothHandPose(this.smoothRight, pose, this.smoothingAlpha);
+          rightPose = this.smoothRight;
           rightWristLm = lm[LANDMARK.WRIST];
         } else if (handedness === "Right") {
-          leftPose = pose;
+          this.smoothLeft = smoothHandPose(this.smoothLeft, pose, this.smoothingAlpha);
+          leftPose = this.smoothLeft;
           leftWristLm = lm[LANDMARK.WRIST];
         }
       }
+    } else {
+      // No hands visible — reset smoothed caches so a re-entering hand starts fresh.
+      this.smoothRight = null;
+      this.smoothLeft = null;
     }
 
     const bodyLandmarks: NormalizedLandmark[] | null =
@@ -526,10 +600,16 @@ export class PoseDetector {
 
     if (bodyLandmarks && bodyLandmarks.length >= 25) {
       if (rightWristLm) {
-        rightHandPos = computeHandRelativePos(rightWristLm, bodyLandmarks);
+        this.smoothRightPos = smoothHandRelativePos(this.smoothRightPos, computeHandRelativePos(rightWristLm, bodyLandmarks), this.smoothingAlpha);
+        rightHandPos = this.smoothRightPos;
+      } else {
+        this.smoothRightPos = null;
       }
       if (leftWristLm) {
-        leftHandPos = computeHandRelativePos(leftWristLm, bodyLandmarks);
+        this.smoothLeftPos = smoothHandRelativePos(this.smoothLeftPos, computeHandRelativePos(leftWristLm, bodyLandmarks), this.smoothingAlpha);
+        leftHandPos = this.smoothLeftPos;
+      } else {
+        this.smoothLeftPos = null;
       }
     }
 
@@ -539,7 +619,12 @@ export class PoseDetector {
       faceResult.faceBlendshapes.length > 0 &&
       faceResult.faceBlendshapes[0]?.categories
     ) {
-      detectedFace = extractFaceExpression(faceResult.faceBlendshapes[0].categories);
+      this.smoothFace = smoothFaceExpression(
+        this.smoothFace,
+        extractFaceExpression(faceResult.faceBlendshapes[0].categories),
+        this.smoothingAlpha,
+      );
+      detectedFace = this.smoothFace;
     }
 
     return {

@@ -11,3 +11,5 @@ vite.config.ts.*
 .local
 .config
 *.log
+__pycache__/
+*.pyc

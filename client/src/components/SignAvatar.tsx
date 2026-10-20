@@ -10,6 +10,29 @@ interface SignAvatarProps {
   signQueue?: string[];
   finalResult?: string;
   interimResult?: string;
+  /**
+   * Optional caption-sync hook: called when the queue starts playing each word,
+   * with how the word is rendered ('fbx' = mocap FBX, 'pose' = procedurally
+   * posed keyframes, 'fingerspell' = letter-by-letter fallback).
+   * Additive option — original behavior is unchanged when omitted.
+   */
+  onWordChange?: (word: string, mode: 'fbx' | 'pose' | 'fingerspell' | null) => void;
+  /**
+   * Hide the hard-coded speech-mode status labels ("Ready" / "Speak to see…")
+   * so embedders can render their own empty states. Additive — defaults to false.
+   */
+  hideSpeechLabels?: boolean;
+  /**
+   * Optional hook fired when the signing queue drains and the avatar
+   * has returned to idle. Additive — ignored when omitted.
+   */
+  onIdle?: () => void;
+  /**
+   * Playback pace multiplier for procedural sign keyframes.
+   * 1 = authored timing (default), 1.4 = slower/more readable, 0.7 = faster.
+   * Additive — default preserves original timing.
+   */
+  pace?: number;
 }
 
 interface QueueItem {
@@ -29,13 +52,18 @@ const IDLE_RIGHT: HandPose = {
 };
 const IDLE_LEFT: HandPose = { ...IDLE_RIGHT, wristY: 0.12 };
 
-export function SignAvatar({ currentWord, isRecording, signQueue, finalResult, interimResult }: SignAvatarProps) {
+export function SignAvatar({ currentWord, isRecording, signQueue, finalResult, interimResult, onWordChange, hideSpeechLabels, onIdle, pace = 1 }: SignAvatarProps) {
   const canvasRef   = useRef<HTMLCanvasElement>(null);
   const avatarRef   = useRef<AvatarController | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const rafRef      = useRef<number>(0);
   const [webglError, setWebglError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  /** Additive: bumped when the avatar finishes loading so stashed queues replay. */
+  const [loadTick, setLoadTick] = useState(0);
+  /** Additive: pace prop mirrored into a ref so the animation loop always reads the current value. */
+  const paceRef = useRef(pace);
+  paceRef.current = pace;
 
   const poseQueueRef        = useRef<QueueItem[]>([]);
   const currentItemRef      = useRef<QueueItem | null>(null);
@@ -46,6 +74,7 @@ export function SignAvatar({ currentWord, isRecording, signQueue, finalResult, i
   const prevSignQueueRef    = useRef<string[] | undefined>(undefined);
   const abortRef            = useRef<AbortController | null>(null);
   const signingRef          = useRef<boolean>(false);
+  const pendingQueueRef     = useRef<string[]>([]);
   const wordQueueRef        = useRef<string[]>([]);
   const processingRef       = useRef<boolean>(false);
 
@@ -135,6 +164,12 @@ export function SignAvatar({ currentWord, isRecording, signQueue, finalResult, i
         scene.add(avatar.root);
         avatarRef.current = avatar;
 
+        // Additive: re-trigger the queue effect so messages sent while the
+        // model was loading are replayed instead of dropped.
+        if (!cancelled && pendingQueueRef.current.length > 0) {
+          setLoadTick((v) => v + 1);
+        }
+
         avatar.applyHandPose('right', IDLE_RIGHT, 1);
         avatar.applyHandPose('left', IDLE_LEFT, 1);
         avatar.applyExpression(NEUTRAL_FACE, 1);
@@ -175,16 +210,18 @@ export function SignAvatar({ currentWord, isRecording, signQueue, finalResult, i
             if (cur) {
               av.applySway(now);
               const elapsed = now - itemStartRef.current;
-              const frameDur = cur.holdMs * 0.55;
-              const blendIn = Math.min(elapsed / 80, 1);
+              const frameDur = cur.holdMs * 0.55 * paceRef.current;
+              // Additive: gentler transitions (was 80 ms snap / dt/35 lerp) to
+              // remove the "glitchy snap" between keyframes.
+              const blendIn = Math.min(elapsed / 160, 1);
               const eased = blendIn * blendIn * (3 - 2 * blendIn);
-              const baseLerp = Math.min(dt / 35, 1);
+              const baseLerp = Math.min(dt / 60, 1);
               const lerpT = baseLerp * (0.4 + 0.6 * eased);
               av.applyHandPose('right', cur.right, lerpT);
               av.applyHandPose('left', cur.left, lerpT);
               av.applyExpression(cur.face ?? NEUTRAL_FACE, lerpT);
 
-              const posT = Math.min(dt / 40, 1) * (0.4 + 0.6 * eased);
+              const posT = Math.min(dt / 65, 1) * (0.4 + 0.6 * eased);
               av.setHandTarget('right',
                 cur.right.posX ?? 0,
                 cur.right.posY ?? 0,
@@ -252,13 +289,29 @@ export function SignAvatar({ currentWord, isRecording, signQueue, finalResult, i
   }, []);
 
   useEffect(() => {
-    if (!signQueue?.length || signQueue === prevSignQueueRef.current) return;
-    prevSignQueueRef.current = signQueue;
-
     const av = avatarRef.current;
-    if (!av) return;
+    const hasPending = pendingQueueRef.current.length > 0;
 
-    wordQueueRef.current.push(...signQueue);
+    if (signQueue?.length && signQueue !== prevSignQueueRef.current) {
+      prevSignQueueRef.current = signQueue;
+      if (!av) {
+        // Avatar model still loading — stash the words so they replay once
+        // ready instead of being dropped (additive fix; original code
+        // returned silently here).
+        pendingQueueRef.current.push(...signQueue);
+        return;
+      }
+      wordQueueRef.current.push(...signQueue);
+    } else if (!hasPending) {
+      // No new queue (or identical re-fire) and nothing stashed — nothing to do.
+      return;
+    } else {
+      wordQueueRef.current.push(...pendingQueueRef.current);
+      pendingQueueRef.current = [];
+    }
+    // Defensive (additive): the pending-drain path runs right after avatar load
+    // and `av` can still read as null — bail rather than crash the render loop.
+    if (!av) return;
     signingRef.current = true;
 
     if (processingRef.current) return;
@@ -277,23 +330,28 @@ export function SignAvatar({ currentWord, isRecording, signQueue, finalResult, i
         const lower = word.toLowerCase().trim();
         if (!lower) continue;
 
+        let mode: 'fbx' | 'pose' | 'fingerspell' | null = null;
+
         if (hasWordAnimation(lower)) {
+          mode = 'fbx';
           try {
             await av.loadAndPlayAnimation(getWordAnimationUrl(lower)!);
           } catch (err) {
             console.warn('FBX animation failed for word:', lower, err);
             const fallback = wordToSignQueue(lower);
             poseQueueRef.current.push(...fallback);
-            const totalMs = fallback.reduce((sum, f) => sum + f.holdMs * 0.55, 0);
+            const totalMs = fallback.reduce((sum, f) => sum + f.holdMs * 0.55, 0) * (paceRef.current || 1);
             await waitMs(totalMs + 120, ac.signal);
           }
         } else {
           const poseFrames = wordToSignQueue(lower);
           if (poseFrames.length > 0) {
+            mode = 'pose';
             poseQueueRef.current.push(...poseFrames);
-            const totalMs = poseFrames.reduce((sum, f) => sum + f.holdMs * 0.55, 0);
+            const totalMs = poseFrames.reduce((sum, f) => sum + f.holdMs * 0.55, 0) * (paceRef.current || 1);
             await waitMs(totalMs + 120, ac.signal);
           } else {
+            mode = 'fingerspell';
             for (const letter of lower) {
               if (ac.signal.aborted) break;
               if (/[a-z]/.test(letter)) {
@@ -306,6 +364,10 @@ export function SignAvatar({ currentWord, isRecording, signQueue, finalResult, i
             }
           }
         }
+
+        if (onWordChange) {
+          try { onWordChange(lower, mode); } catch (cbErr) { console.warn('onWordChange error:', cbErr); }
+        }
       }
 
       processingRef.current = false;
@@ -313,8 +375,11 @@ export function SignAvatar({ currentWord, isRecording, signQueue, finalResult, i
       if (!ac.signal.aborted) {
         av.restoreToIdle();
       }
+      if (onIdle) {
+        try { onIdle(); } catch (idleErr) { console.warn('onIdle error:', idleErr); }
+      }
     })();
-  }, [signQueue]);
+  }, [signQueue, loadTick]);
 
   useEffect(() => {
     if (!isRecording) {
@@ -382,6 +447,7 @@ export function SignAvatar({ currentWord, isRecording, signQueue, finalResult, i
         </div>
       )}
 
+      {!hideSpeechLabels && (
       <div className="absolute top-3 left-3 flex items-center gap-2 pointer-events-none">
         {isRecording ? (
           <>
@@ -392,9 +458,10 @@ export function SignAvatar({ currentWord, isRecording, signQueue, finalResult, i
           <span className="text-xs text-white/25 tracking-wider uppercase">Ready</span>
         )}
       </div>
+      )}
 
       <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-[90%] max-w-2xl pointer-events-none" data-testid="subtitle-area" aria-live="polite" aria-atomic="true" role="status">
-        {(finalResult || interimResult) ? (
+        {hideSpeechLabels ? null : (finalResult || interimResult) ? (
           <div
             className="px-5 py-2.5 rounded-lg text-center"
             style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }}

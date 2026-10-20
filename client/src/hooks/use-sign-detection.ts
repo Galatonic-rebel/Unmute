@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { PoseDetector, type DetectionResult } from "@/lib/pose-detector";
-import { SignMatcher, type MatchCandidate } from "@/lib/sign-matcher";
+import { SignMatcher, type MatchCandidate, type SignMatcherOptions } from "@/lib/sign-matcher";
 import type { NormalizedLandmark } from "@mediapipe/tasks-vision";
 
 const TARGET_FPS = 15;
@@ -16,6 +16,8 @@ export interface UseSignDetectionReturn {
   isDetecting: boolean;
   recognizedWords: string[];
   currentSign: string | null;
+  /** Confidence (0..1) of the most recent recognition event, null if none. */
+  lastConfidence: number | null;
   landmarksRef: React.RefObject<NormalizedLandmark[][] | null>;
   bodyLandmarksRef: React.RefObject<NormalizedLandmark[] | null>;
   debugInfo: DebugInfo | null;
@@ -25,11 +27,15 @@ export interface UseSignDetectionReturn {
   reset: () => void;
 }
 
-export function useSignDetection(): UseSignDetectionReturn {
+export function useSignDetection(matcherOptions?: SignMatcherOptions): UseSignDetectionReturn {
   const [isDetecting, setIsDetecting] = useState(false);
   const [recognizedWords, setRecognizedWords] = useState<string[]>([]);
   const [currentSign, setCurrentSign] = useState<string | null>(null);
+  const [lastConfidence, setLastConfidence] = useState<number | null>(null);
   const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
+
+  // Frozen at hook mount — matcher options are a deployment-time choice, not dynamic state.
+  const matcherOptionsRef = useRef<SignMatcherOptions | undefined>(matcherOptions);
 
   const landmarksRef = useRef<NormalizedLandmark[][] | null>(null);
   const bodyLandmarksRef = useRef<NormalizedLandmark[] | null>(null);
@@ -109,6 +115,7 @@ export function useSignDetection(): UseSignDetectionReturn {
 
         if (matchResult) {
           setCurrentSign(matchResult.word);
+          setLastConfidence(matchResult.confidence);
           setRecognizedWords((prev) => [...prev, matchResult.word]);
         } else if (!result.right && !result.left) {
           setCurrentSign(null);
@@ -141,7 +148,8 @@ export function useSignDetection(): UseSignDetectionReturn {
       await detector.init(video);
       detectorRef.current = detector;
 
-      matcherRef.current = new SignMatcher();
+      const matcher = new SignMatcher(matcherOptionsRef.current);
+      matcherRef.current = matcher;
 
       isDetectingRef.current = true;
       setIsDetecting(true);
@@ -158,6 +166,7 @@ export function useSignDetection(): UseSignDetectionReturn {
   const reset = useCallback(() => {
     setRecognizedWords([]);
     setCurrentSign(null);
+    setLastConfidence(null);
     if (matcherRef.current) {
       matcherRef.current.reset();
     }
@@ -182,6 +191,7 @@ export function useSignDetection(): UseSignDetectionReturn {
     isDetecting,
     recognizedWords,
     currentSign,
+    lastConfidence,
     landmarksRef,
     bodyLandmarksRef,
     debugInfo,

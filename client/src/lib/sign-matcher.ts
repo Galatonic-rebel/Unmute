@@ -19,6 +19,22 @@ export interface MatchCandidate {
   posDist: number;
 }
 
+export interface SignMatcherOptions {
+  /**
+   * Restrict the word-match pool to these WORD_SIGNS keys.
+   * Keys that do not exist in the dictionary are ignored with a console warning.
+   * Omit to match against the full dictionary (default, unchanged behavior).
+   */
+  vocabulary?: string[];
+  /**
+   * Include A–Z fingerspelling handshapes as candidates.
+   * Note: letter candidates currently score with posDist 0, which makes them
+   * out-rank real word signs for many open-hand shapes. Set false for
+   * constrained-vocabulary recognition (prototype). Default: true.
+   */
+  includeLetters?: boolean;
+}
+
 /**
  * Complete input for a single frame of sign detection.
  * Includes hand poses, spatial positions relative to body, and facial expression.
@@ -262,6 +278,27 @@ export class SignMatcher {
   public lastRegion: string = "";
   public lastPosY: number = 0;
 
+  /** Word-sign pool actually used for matching (whole dictionary unless restricted). */
+  private activeWords: Record<string, typeof WORD_SIGNS[string]>;
+  /** Fingerspelling pool, or null when letters are excluded. */
+  private activeLetters: Record<string, typeof FINGERSPELLING[string]> | null;
+
+  constructor(options: SignMatcherOptions = {}) {
+    if (options.vocabulary) {
+      this.activeWords = {};
+      for (const word of options.vocabulary) {
+        if (word in WORD_SIGNS) {
+          this.activeWords[word] = WORD_SIGNS[word];
+        } else {
+          console.warn("SignMatcher: vocabulary word not in dictionary:", word);
+        }
+      }
+    } else {
+      this.activeWords = WORD_SIGNS;
+    }
+    this.activeLetters = options.includeLetters === false ? null : FINGERSPELLING;
+  }
+
   /**
    * Process a single frame of detection data and return a recognized sign if
    * the stability and confidence criteria are met.
@@ -297,20 +334,22 @@ export class SignMatcher {
 
     const candidates: MatchCandidate[] = [];
 
-    for (const [letter, pose] of Object.entries(FINGERSPELLING)) {
-      let shapeDist = handShapeDistance(dominantHand, pose);
-      if (dominantPos && detRegionIdx >= 3) {
-        shapeDist += 0.15;
-      } else if (dominantPos && detRegionIdx === 2) {
-        shapeDist += 0.05;
+    if (this.activeLetters) {
+      for (const [letter, pose] of Object.entries(this.activeLetters)) {
+        let shapeDist = handShapeDistance(dominantHand, pose);
+        if (dominantPos && detRegionIdx >= 3) {
+          shapeDist += 0.15;
+        } else if (dominantPos && detRegionIdx === 2) {
+          shapeDist += 0.05;
+        }
+        const calibration = CALIBRATION_OFFSETS[letter] ?? 0;
+        const contextBoost = this.getContextBoost(letter);
+        const finalDist = Math.max(0, shapeDist + calibration + contextBoost);
+        candidates.push({ word: letter, distance: finalDist, shapeDist, posDist: 0 });
       }
-      const calibration = CALIBRATION_OFFSETS[letter] ?? 0;
-      const contextBoost = this.getContextBoost(letter);
-      const finalDist = Math.max(0, shapeDist + calibration + contextBoost);
-      candidates.push({ word: letter, distance: finalDist, shapeDist, posDist: 0 });
     }
 
-    for (const [word, sign] of Object.entries(WORD_SIGNS)) {
+    for (const [word, sign] of Object.entries(this.activeWords)) {
       if (sign.frames.length === 0) continue;
       const firstFrame = sign.frames[0];
       const refPose = firstFrame.right;
