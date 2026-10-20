@@ -28,7 +28,7 @@ function App() {
           fallbackTitle="Application Error"
           fallbackDescription="The application encountered an unexpected error. Please try refreshing the page."
         >
-          <Router />
+          <AppRoutes />
         </ErrorBoundary>
       </TooltipProvider>
     </QueryClientProvider>
