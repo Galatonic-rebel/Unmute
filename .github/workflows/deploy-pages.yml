@@ -35,7 +35,10 @@ jobs:
         with:
           node-version: 22
       - run: npm ci
-      - run: npx vite build --base=/Unmute/ --outDir dist/public --emptyOutDir
+      # NOTE: --outDir is resolved against Vite's configured root (client/), so
+      # use ../ to place the bundle at the repo-root dist/public expected by
+      # the Pages artifact upload below.
+      - run: npx vite build --base=/Unmute/ --outDir ../dist/public --emptyOutDir
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist/public
