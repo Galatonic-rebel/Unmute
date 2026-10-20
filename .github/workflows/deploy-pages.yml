@@ -1,0 +1,51 @@
+# Deploys the unmute engine (the built React app in client/) as a static site
+# to GitHub Pages on every push to main.
+#
+# One-time enablement (repo owner): Settings → Pages → Build and deployment →
+# Source: "GitHub Actions". The engine then lives at:
+#     https://<owner>.github.io/Unmute/
+#
+# The engine is fully client-side (MediaPipe WASM runs in the browser), so a
+# static host is sufficient. Camera access requires HTTPS, which Pages provides.
+#
+# NOTE: the app is served under the repo path prefix, so the Vite build must
+# use the matching base path (/Unmute/). Locally nothing changes (base is "/").
+name: Deploy engine to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npx vite build --base=/Unmute/ --outDir dist/public --emptyOutDir
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/public
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

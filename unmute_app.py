@@ -36,7 +36,15 @@ import streamlit as st
 BASE_DIR = Path(__file__).resolve().parent
 DIST_DIR = BASE_DIR / "dist" / "public"
 PORT = int(os.environ.get("UNMUTE_PORT", "8618"))
-APP_URL = f"http://localhost:{PORT}/"
+
+# On cloud (Streamlit Community Cloud) there is no Node and no local port: the
+# engine bundle must be hosted at a public HTTPS URL instead — set this env var
+# (e.g. UNMUTE_ENGINE_URL=https://galatonic-rebel.github.io/Unmute) and this
+# shell becomes a pure dashboard + launcher. Locally it stays unset and the
+# local static server (build + serve dist/public) is used, as before.
+ENGINE_URL = os.environ.get("UNMUTE_ENGINE_URL", "").strip().rstrip("/")
+IS_CLOUD = bool(ENGINE_URL)
+APP_URL = ENGINE_URL if IS_CLOUD else f"http://localhost:{PORT}/"
 
 # ── Curated vocabulary (kept in sync with the web app's Studio.tsx) ──────────
 SUPPORTED_SIGNS = {
@@ -167,22 +175,25 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-if not ensure_build():
-    st.stop()
-
-# Start + verify the engine server
-try:
-    start_static_server()
-except OSError as exc:
-    st.error(
-        f"Could not start the local engine server on port {PORT} ({exc}).\n\n"
-        "Another program may be using that port — set the `UNMUTE_PORT` environment "
-        "variable to a free port and restart.\n\n"
-        f"You can still open unmute directly at http://localhost:{PORT}/ if it is already running."
-    )
-    st.stop()
-
-ready = server_is_up()
+ready = True
+if IS_CLOUD:
+    st.info(f"Engine hosted at `{APP_URL}` — the Launch button opens it in its own tab "
+            "(camera access always requires a top-level tab).")
+else:
+    if not ensure_build():
+        st.stop()
+    # Start + verify the engine server
+    try:
+        start_static_server()
+    except OSError as exc:
+        st.error(
+            f"Could not start the local engine server on port {PORT} ({exc}).\n\n"
+            "Another program may be using that port — set the `UNMUTE_PORT` environment "
+            "variable to a free port and restart.\n\n"
+            f"You can still open unmute directly at http://localhost:{PORT}/ if it is already running."
+        )
+        st.stop()
+    ready = server_is_up()
 
 # Launch button
 b1, b2 = st.columns([3, 2])
@@ -194,10 +205,16 @@ with b1:
         use_container_width=True,
     )
 with b2:
+    if IS_CLOUD:
+        hint = "☁️ remote engine"
+    elif ready:
+        hint = "🟢 engine running locally"
+    else:
+        hint = "🟡 engine warming up"
+    src = APP_URL if IS_CLOUD else f"localhost:{PORT}"
     st.markdown(
         f'<div style="padding-top:.45rem; text-align:center; font-size:.8rem; color:#94a3b8;">'
-        f'{"🟢 engine running locally" if ready else "🟡 engine warming up"}<br>'
-        f'<code style="font-size:.72rem;">localhost:{PORT}</code></div>',
+        f'{hint}<br><code style="font-size:.72rem;">{src}</code></div>',
         unsafe_allow_html=True,
     )
 
