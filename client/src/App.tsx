@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Router, Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -8,11 +8,14 @@ import NotFound from "@/pages/not-found";
 import Studio from "@/pages/Studio";
 
 function Router() {
+  // Serve under the Vite build base (e.g. /Unmute on GitHub Pages, / locally).
   return (
-    <Switch>
-      <Route path="/" component={Studio} />
-      <Route component={NotFound} />
-    </Switch>
+    <Router base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+      <Switch>
+        <Route path="/" component={Studio} />
+        <Route component={NotFound} />
+      </Switch>
+    </Router>
   );
 }
 
